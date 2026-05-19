@@ -186,6 +186,9 @@ def _hparams(algorithm, dataset, random_seed):
         else:
             _hparam('urm_discriminator_lr', 5e-5, lambda r: 10**r.uniform(-6, -4.5))
 
+    from domainbed.dwa_hparams_registry import add_hparams as add_dwa_hparams
+    add_dwa_hparams(algorithm, dataset, _hparam)
+
 
     if algorithm == "ADRMX":
         _hparam('cnt_lambda', 1.0, lambda r: r.choice([1.0]))

@@ -57,10 +57,14 @@ ALGORITHMS = [
     'RDM',
     'ADRMX',
     'URM',
+    'DWA_CORAL',
 ]
 
 def get_algorithm_class(algorithm_name):
     """Return the algorithm class with the given name."""
+    if algorithm_name == 'DWA_CORAL' and algorithm_name not in globals():
+        from domainbed.dwa_algorithms import DWA_CORAL
+        globals()['DWA_CORAL'] = DWA_CORAL
     if algorithm_name not in globals():
         raise NotImplementedError("Algorithm not found: {}".format(algorithm_name))
     return globals()[algorithm_name]
