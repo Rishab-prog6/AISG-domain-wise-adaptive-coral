@@ -66,3 +66,14 @@ The expected objective is:
 loss = weighted classification loss
      + lambda * weighted CORAL alignment loss
      + beta * domain risk variance penalty
+```
+
+----
+
+## Installation
+
+We recommend using Python 3.10.
+
+```bash
+conda create -n domainbed python=3.10 -y
+conda activate domainbed
