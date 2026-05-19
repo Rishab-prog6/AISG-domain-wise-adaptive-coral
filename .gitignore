@@ -1,0 +1,43 @@
+# datasets
+data/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# raw experiment outputs / checkpoints
+outputs/
+checkpoints/
+runs/
+wandb/
+tensorboard/
+*.pth
+*.pt
+*.ckpt
+
+# logs
+*.log
+out.txt
+err.txt
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.cache/
+.ipynb_checkpoints/
+
+# environments
+.env
+.venv/
+venv/
+conda-meta/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
