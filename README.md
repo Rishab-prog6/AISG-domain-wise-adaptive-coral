@@ -77,3 +77,36 @@ We recommend using Python 3.10.
 ```bash
 conda create -n domainbed python=3.10 -y
 conda activate domainbed
+```
+
+- Install PyTorch separately according to your GPU and CUDA version.
+- For our RTX 5090 environment, we used the CUDA 12.8 PyTorch wheels:
+``
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+``
+
+- Then install the remaining dependencies:
+``
+pip install -r requirements.txt
+``
+
+Check the installation:
+
+``
+python -c "import torch; print(torch.__version__); print(torch.version.cuda); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+``
+
+Expected output should show CUDA is available and the correct GPU name, for example:
+
+``
+2.11.0+cu128
+12.8
+True
+NVIDIA GeForce RTX 5090
+Note on DomainBed DataLoader
+``
+
+- The original DomainBed dataloader caused hanging issues in our RTX 5090 + PyTorch 2.11 environment.
+We replaced domainbed/lib/fast_data_loader.py with a safer implementation based on standard PyTorch DataLoader.
+
+- This modification is used consistently for all baselines and proposed methods in our experiments. Therefore, the comparisons between methods remain fair under our experimental setup, although the numbers should be interpreted as results from a modified DomainBed environment rather than an exact reproduction of the original DomainBed benchmark.
