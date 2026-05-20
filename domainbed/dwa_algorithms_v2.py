@@ -1,8 +1,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
-Improved DWA_CORAL.
+Improved DWA_CORAL and lightweight variants.
 
-Key fixes over the v1 implementation:
+DWA_CORAL (v2) key fixes over the original implementation:
 1. CORAL alignment is normalized by 4 * d^2 (standard CORAL scaling). Without
    this, ||C_e - C_bar||_F^2 is ~O(d^2) and dwarfs the cross-entropy loss,
    so the optimizer mostly minimizes CORAL and ignores the labels.
@@ -11,7 +11,23 @@ Key fixes over the v1 implementation:
 3. A warmup phase keeps the per-domain weights uniform for the first
    `dwa_coral_warmup` steps so the classifier sees every domain equally
    before the adaptive weighting kicks in.
-4. Hparam defaults are retuned to match the new normalization.
+
+Variants (all share the same CORAL/normalization machinery, they only differ
+in how the per-domain weights are computed and applied):
+
+* DWA_CORAL_ALIGNONLY
+    Classification loss stays an unweighted ERM-style average; adaptive
+    weights are applied to the CORAL alignment term only. This avoids
+    over-emphasizing high-loss domains in the supervised signal.
+
+* DWA_CORAL_CLIPPED
+    Same as DWA_CORAL (weighted classification + weighted alignment) but the
+    softmax weights are clamped to [dwa_weight_min, dwa_weight_max] and then
+    renormalized so no single domain can dominate.
+
+* DWA_CORAL_EMA
+    Same as DWA_CORAL but the weights are computed from an exponential moving
+    average of per-domain losses instead of the noisy current-batch loss.
 """
 
 import torch
@@ -22,18 +38,32 @@ from domainbed.algorithms import ERM
 
 ALGORITHMS = [
     "DWA_CORAL",
+    "DWA_CORAL_ALIGNONLY",
+    "DWA_CORAL_CLIPPED",
+    "DWA_CORAL_EMA",
 ]
 
 
-class DWA_CORAL(ERM):
-    """Domain-wise Adaptive CORAL (improved)."""
+class _DWACoralBase(ERM):
+    """Shared machinery for the DWA_CORAL family.
+
+    Subclasses override `_compute_weights` (and optionally the class attribute
+    `weight_cls_loss`). Weights returned by `_compute_weights` must be detached
+    (they are derived from detached losses) and sum to 1.
+    """
+
+    # If True the classification loss is the weighted sum over domains;
+    # if False it is the plain (ERM-style) mean over domains.
+    weight_cls_loss = True
 
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(DWA_CORAL, self).__init__(
+        super(_DWACoralBase, self).__init__(
             input_shape, num_classes, num_domains, hparams)
+        self.num_domains = num_domains
         self.register_buffer(
             "update_count", torch.tensor(0, dtype=torch.long))
 
+    # ----- CORAL helpers ---------------------------------------------------
     @staticmethod
     def _covariance(features):
         n = features.size(0)
@@ -42,17 +72,39 @@ class DWA_CORAL(ERM):
             return centered.t().matmul(centered)
         return centered.t().matmul(centered) / (n - 1)
 
-    def _adaptive_weights(self, domain_losses):
-        n_domains = domain_losses.shape[0]
-        warmup = int(self.hparams.get("dwa_coral_warmup", 0))
-        if warmup > 0 and self.update_count.item() < warmup:
-            return domain_losses.new_full((n_domains,), 1.0 / n_domains)
+    def _coral_terms(self, features):
+        """Per-domain ||C_e - C_bar||_F^2, normalized by 4 * d^2."""
+        feature_dim = features[0].shape[1]
+        coral_scale = 4.0 * float(feature_dim) * float(feature_dim)
 
+        covariances = torch.stack([self._covariance(z) for z in features])
+        mean_covariance = covariances.mean(dim=0)
+        return torch.stack([
+            ((c_e - mean_covariance) ** 2).sum() / coral_scale
+            for c_e in covariances
+        ])
+
+    # ----- weighting helpers ----------------------------------------------
+    def _softmax_weights(self, detached_losses):
+        """Numerically stable softmax(tau * detached_losses)."""
         tau = self.hparams["dwa_coral_tau"]
-        det = domain_losses.detach()
-        logits = tau * (det - det.max())
+        logits = tau * (detached_losses - detached_losses.max())
         return F.softmax(logits, dim=0)
 
+    def _in_warmup(self):
+        warmup = int(self.hparams.get("dwa_coral_warmup", 0))
+        return warmup > 0 and self.update_count.item() < warmup
+
+    @staticmethod
+    def _uniform_weights(reference):
+        n = reference.shape[0]
+        return reference.new_full((n,), 1.0 / n)
+
+    def _compute_weights(self, domain_losses):
+        """Return a detached weight vector (sums to 1). Overridden per variant."""
+        raise NotImplementedError
+
+    # ----- shared update ---------------------------------------------------
     def update(self, minibatches, unlabeled=None):
         features = []
         domain_losses = []
@@ -66,20 +118,15 @@ class DWA_CORAL(ERM):
             domain_losses.append(loss_e)
 
         domain_losses = torch.stack(domain_losses)
-        weights = self._adaptive_weights(domain_losses)
+        weights = self._compute_weights(domain_losses)
 
-        cls_loss = torch.sum(weights * domain_losses)
+        if self.weight_cls_loss:
+            cls_loss = torch.sum(weights * domain_losses)
+        else:
+            cls_loss = domain_losses.mean()
 
-        feature_dim = features[0].shape[1]
-        coral_scale = 4.0 * float(feature_dim) * float(feature_dim)
-
-        covariances = torch.stack([self._covariance(z) for z in features])
-        mean_covariance = covariances.mean(dim=0)
-        coral_penalties = torch.stack([
-            ((c_e - mean_covariance) ** 2).sum() / coral_scale
-            for c_e in covariances
-        ])
-        coral_loss = torch.sum(weights * coral_penalties)
+        coral_terms = self._coral_terms(features)
+        coral_loss = torch.sum(weights * coral_terms)
 
         risk_var = torch.var(domain_losses, unbiased=False)
 
@@ -103,3 +150,73 @@ class DWA_CORAL(ERM):
             "min_domain_loss": domain_losses.min().item(),
             "max_domain_loss": domain_losses.max().item(),
         }
+
+
+class DWA_CORAL(_DWACoralBase):
+    """Domain-wise Adaptive CORAL (v2): weighted classification + alignment."""
+
+    weight_cls_loss = True
+
+    def _compute_weights(self, domain_losses):
+        detached = domain_losses.detach()
+        if self._in_warmup():
+            return self._uniform_weights(detached)
+        return self._softmax_weights(detached)
+
+
+class DWA_CORAL_ALIGNONLY(_DWACoralBase):
+    """Adaptive weights drive the CORAL alignment only.
+
+    The classification loss is the unweighted mean over source domains, so the
+    classifier keeps balanced ERM-like supervision while alignment effort is
+    still concentrated on the hard (high-loss) domains.
+    """
+
+    weight_cls_loss = False
+
+    def _compute_weights(self, domain_losses):
+        return self._softmax_weights(domain_losses.detach())
+
+
+class DWA_CORAL_CLIPPED(_DWACoralBase):
+    """DWA_CORAL with adaptive weights clamped so no domain dominates."""
+
+    weight_cls_loss = True
+
+    def _compute_weights(self, domain_losses):
+        detached = domain_losses.detach()
+        if self._in_warmup():
+            return self._uniform_weights(detached)
+
+        weights = self._softmax_weights(detached)
+        w_min = self.hparams["dwa_weight_min"]
+        w_max = self.hparams["dwa_weight_max"]
+        weights = torch.clamp(weights, min=w_min, max=w_max)
+        return weights / weights.sum()
+
+
+class DWA_CORAL_EMA(_DWACoralBase):
+    """DWA_CORAL whose weights come from an EMA of per-domain losses."""
+
+    weight_cls_loss = True
+
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(DWA_CORAL_EMA, self).__init__(
+            input_shape, num_classes, num_domains, hparams)
+        self.register_buffer("ema_loss", torch.zeros(num_domains))
+        self.register_buffer(
+            "ema_initialized", torch.tensor(False))
+
+    def _compute_weights(self, domain_losses):
+        detached = domain_losses.detach()
+        alpha = self.hparams["dwa_ema_alpha"]
+
+        if not bool(self.ema_initialized):
+            self.ema_loss.copy_(detached)
+            self.ema_initialized.fill_(True)
+        else:
+            self.ema_loss.mul_(alpha).add_(detached, alpha=1.0 - alpha)
+
+        if self._in_warmup():
+            return self._uniform_weights(detached)
+        return self._softmax_weights(self.ema_loss)
