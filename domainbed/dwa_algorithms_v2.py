@@ -34,6 +34,14 @@ in how the per-domain weights are computed and applied):
     a uniform vector with a softmax over a (loss, coral-gap) score, so the
     alignment looks at *both* classification difficulty and current covariance
     mismatch. The uniform mix preserves CORAL-like stability.
+
+* DWA_CORAL_ANCHOR_ALIGNONLY
+    ALIGNONLY-style. Each step picks the lowest-loss source domain as the
+    "anchor", detaches its covariance, and aligns every other source toward
+    detach(C_anchor) instead of toward the mean. The mean-targeted alignment
+    used by the other variants is dragged by the abstract (Sketch/Cartoon)
+    sources; anchoring on the easiest source preserves the natural-image
+    manifold, which targets the Art/Photo test envs specifically.
 """
 
 import torch
@@ -48,6 +56,7 @@ ALGORITHMS = [
     "DWA_CORAL_CLIPPED",
     "DWA_CORAL_EMA",
     "DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY",
+    "DWA_CORAL_ANCHOR_ALIGNONLY",
 ]
 
 
@@ -307,6 +316,117 @@ class DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY(_DWACoralBase):
             "risk_var": risk_var.item(),
             "min_domain_loss": domain_losses.min().item(),
             "max_domain_loss": domain_losses.max().item(),
+        }
+        for i in range(weights.shape[0]):
+            metrics[f"weight_{i}"] = weights[i].item()
+            metrics[f"coral_term_{i}"] = coral_terms[i].item()
+        return metrics
+
+
+class DWA_CORAL_ANCHOR_ALIGNONLY(_DWACoralBase):
+    """ALIGNONLY classifier + anchor-based CORAL alignment.
+
+    Each step the source domain with the lowest detached loss becomes the
+    `anchor`. Its covariance is detached and treated as the alignment target,
+    so anchor features are pulled only by classification gradient. Every
+    other source contributes
+        coral_term_e = ||C_e - detach(C_anchor)||_F^2 / (4 d^2)
+    and the non-anchor terms are combined with mixed (uniform / softmax)
+    weights:
+        w_other = (1 - gamma) * uniform + gamma * softmax(tau * detach(L_other))
+        coral_loss = sum_{e != anchor} w_other_e * coral_term_e
+
+    Classification loss stays the unweighted ERM-style mean (ALIGNONLY).
+
+    Motivation: in PACS the lowest-loss source is typically the most natural-
+    image-like one (Photo when test=Art, Art when test=Photo). Mean-targeted
+    CORAL is dragged by the abstract sources (Sketch/Cartoon); anchoring
+    preserves the natural-image manifold and should help Art/Photo
+    generalization at a likely small cost on Sketch.
+    """
+
+    weight_cls_loss = False  # informational; we override update()
+
+    def _other_weights(self, detached_losses, anchor_idx):
+        """Return a length-n weight vector with 0 at anchor and a normalized
+        (uniform / softmax) mix over the n-1 non-anchor positions."""
+        n = detached_losses.shape[0]
+        weights = detached_losses.new_zeros(n)
+        if n <= 1:
+            return weights
+
+        mask = torch.ones(n, dtype=torch.bool, device=detached_losses.device)
+        mask[anchor_idx] = False
+        others = detached_losses[mask]
+        m = others.shape[0]
+
+        gamma = self.hparams["dwa_mix_gamma"]
+        tau = self.hparams["dwa_coral_tau"]
+
+        w_uniform = others.new_full((m,), 1.0 / m)
+        w_adapt = F.softmax(tau * (others - others.max()), dim=0)
+        w_others = (1.0 - gamma) * w_uniform + gamma * w_adapt
+        w_others = w_others / w_others.sum()
+
+        weights[mask] = w_others
+        return weights
+
+    def update(self, minibatches, unlabeled=None):
+        features = []
+        domain_losses = []
+
+        for x_e, y_e in minibatches:
+            z_e = self.featurizer(x_e)
+            logits_e = self.classifier(z_e)
+            loss_e = F.cross_entropy(logits_e, y_e)
+            features.append(z_e)
+            domain_losses.append(loss_e)
+
+        domain_losses = torch.stack(domain_losses)
+        detached_losses = domain_losses.detach()
+        anchor_idx = int(torch.argmin(detached_losses).item())
+
+        covariances = [self._covariance(z) for z in features]
+        c_anchor_detached = covariances[anchor_idx].detach()
+
+        feature_dim = features[0].shape[1]
+        coral_scale = 4.0 * float(feature_dim) * float(feature_dim)
+
+        coral_terms_list = []
+        for e, c_e in enumerate(covariances):
+            if e == anchor_idx:
+                # Anchor contributes 0 to alignment; keep entry for logging.
+                coral_terms_list.append(domain_losses.new_zeros(()))
+            else:
+                coral_terms_list.append(
+                    ((c_e - c_anchor_detached) ** 2).sum() / coral_scale)
+        coral_terms = torch.stack(coral_terms_list)
+
+        weights = self._other_weights(detached_losses, anchor_idx)
+        coral_loss = torch.sum(weights * coral_terms)
+
+        cls_loss = domain_losses.mean()
+        risk_var = torch.var(domain_losses, unbiased=False)
+
+        loss = (
+            cls_loss
+            + self.hparams["dwa_coral_lambda"] * coral_loss
+            + self.hparams["dwa_coral_beta"] * risk_var
+        )
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        self.update_count += 1
+
+        metrics = {
+            "loss": loss.item(),
+            "cls_loss": cls_loss.item(),
+            "coral_loss": coral_loss.item(),
+            "risk_var": risk_var.item(),
+            "min_domain_loss": domain_losses.min().item(),
+            "max_domain_loss": domain_losses.max().item(),
+            "anchor_idx": anchor_idx,
         }
         for i in range(weights.shape[0]):
             metrics[f"weight_{i}"] = weights[i].item()

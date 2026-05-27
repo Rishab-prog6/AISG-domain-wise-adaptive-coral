@@ -29,6 +29,7 @@ DWA_ALGORITHMS = [
     "DWA_CORAL_CLIPPED",
     "DWA_CORAL_EMA",
     "DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY",
+    "DWA_CORAL_ANCHOR_ALIGNONLY",
 ]
 
 
@@ -43,6 +44,17 @@ def add_hparams(algorithm, dataset, _hparam):
         _hparam("dwa_coral_tau", 0.5, lambda r: 10 ** r.uniform(-1, 0.5))
         _hparam("dwa_coral_warmup", 100,
                 lambda r: int(r.choice([0, 100, 500])))
+        return
+
+    if algorithm == "DWA_CORAL_ANCHOR_ALIGNONLY":
+        _hparam("dwa_coral_lambda", 0.3,
+                lambda r: 10 ** r.uniform(-1.5, 0))
+        _hparam("dwa_coral_beta", 0.0,
+                lambda r: r.choice([0.0, 1e-3, 1e-2]))
+        _hparam("dwa_coral_tau", 1.0,
+                lambda r: 10 ** r.uniform(-0.5, 0.5))
+        _hparam("dwa_mix_gamma", 0.5,
+                lambda r: r.uniform(0.0, 1.0))
         return
 
     if algorithm == "DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY":
