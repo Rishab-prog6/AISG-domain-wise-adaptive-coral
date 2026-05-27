@@ -28,6 +28,12 @@ in how the per-domain weights are computed and applied):
 * DWA_CORAL_EMA
     Same as DWA_CORAL but the weights are computed from an exponential moving
     average of per-domain losses instead of the noisy current-batch loss.
+
+* DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY
+    ALIGNONLY-style (unweighted classification loss). The CORAL weights blend
+    a uniform vector with a softmax over a (loss, coral-gap) score, so the
+    alignment looks at *both* classification difficulty and current covariance
+    mismatch. The uniform mix preserves CORAL-like stability.
 """
 
 import torch
@@ -41,6 +47,7 @@ ALGORITHMS = [
     "DWA_CORAL_ALIGNONLY",
     "DWA_CORAL_CLIPPED",
     "DWA_CORAL_EMA",
+    "DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY",
 ]
 
 
@@ -220,3 +227,88 @@ class DWA_CORAL_EMA(_DWACoralBase):
         if self._in_warmup():
             return self._uniform_weights(detached)
         return self._softmax_weights(self.ema_loss)
+
+
+class DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY(_DWACoralBase):
+    """ALIGNONLY classifier + mixed (uniform / loss+coral-gap) CORAL weights.
+
+    The CORAL weights are
+        w = (1 - gamma) * uniform + gamma * softmax(tau * score)
+    where
+        score = alpha * zscore(L_e) + (1 - alpha) * zscore(coral_term_e)
+    so the alignment focuses both on high-loss domains and on domains whose
+    feature covariance is currently furthest from the mean. gamma controls
+    how aggressive the deviation from uniform CORAL is.
+
+    `update()` is overridden because the weights depend on `coral_terms`,
+    which the base `_compute_weights(domain_losses)` hook does not receive,
+    and because we log per-domain weights and coral terms for diagnostics.
+    """
+
+    weight_cls_loss = False  # informational; we override update()
+
+    @staticmethod
+    def _zscore(v):
+        # +1e-8 keeps the result finite when all entries are identical
+        # (then numerator is 0 and the output is 0, not NaN).
+        return (v - v.mean()) / (v.std(unbiased=False) + 1e-8)
+
+    def _mixed_weights(self, detached_losses, detached_coral_terms):
+        alpha = self.hparams["dwa_score_alpha"]
+        gamma = self.hparams["dwa_mix_gamma"]
+        tau = self.hparams["dwa_coral_tau"]
+
+        loss_score = self._zscore(detached_losses)
+        gap_score = self._zscore(detached_coral_terms)
+        score = alpha * loss_score + (1.0 - alpha) * gap_score
+
+        w_adapt = F.softmax(tau * score, dim=0)
+        w_uniform = self._uniform_weights(detached_losses)
+
+        weights = (1.0 - gamma) * w_uniform + gamma * w_adapt
+        return weights / weights.sum()
+
+    def update(self, minibatches, unlabeled=None):
+        features = []
+        domain_losses = []
+
+        for x_e, y_e in minibatches:
+            z_e = self.featurizer(x_e)
+            logits_e = self.classifier(z_e)
+            loss_e = F.cross_entropy(logits_e, y_e)
+            features.append(z_e)
+            domain_losses.append(loss_e)
+
+        domain_losses = torch.stack(domain_losses)
+        coral_terms = self._coral_terms(features)
+
+        weights = self._mixed_weights(
+            domain_losses.detach(), coral_terms.detach())
+
+        cls_loss = domain_losses.mean()
+        coral_loss = torch.sum(weights * coral_terms)
+        risk_var = torch.var(domain_losses, unbiased=False)
+
+        loss = (
+            cls_loss
+            + self.hparams["dwa_coral_lambda"] * coral_loss
+            + self.hparams["dwa_coral_beta"] * risk_var
+        )
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        self.update_count += 1
+
+        metrics = {
+            "loss": loss.item(),
+            "cls_loss": cls_loss.item(),
+            "coral_loss": coral_loss.item(),
+            "risk_var": risk_var.item(),
+            "min_domain_loss": domain_losses.min().item(),
+            "max_domain_loss": domain_losses.max().item(),
+        }
+        for i in range(weights.shape[0]):
+            metrics[f"weight_{i}"] = weights[i].item()
+            metrics[f"coral_term_{i}"] = coral_terms[i].item()
+        return metrics
