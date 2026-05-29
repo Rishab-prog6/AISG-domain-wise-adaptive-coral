@@ -30,7 +30,6 @@ DWA_ALGORITHMS = [
     "DWA_CORAL_EMA",
     "DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY",
     "DWA_CORAL_ANCHOR_ALIGNONLY",
-    "DWA_CORAL_ANCHOR_ANNEAL",
 ]
 
 
@@ -50,23 +49,6 @@ def add_hparams(algorithm, dataset, _hparam):
     if algorithm == "DWA_CORAL_ANCHOR_ALIGNONLY":
         _hparam("dwa_coral_lambda", 0.3,
                 lambda r: 10 ** r.uniform(-1.5, 0))
-        _hparam("dwa_coral_beta", 0.0,
-                lambda r: r.choice([0.0, 1e-3, 1e-2]))
-        _hparam("dwa_coral_tau", 1.0,
-                lambda r: 10 ** r.uniform(-0.5, 0.5))
-        _hparam("dwa_mix_gamma", 0.5,
-                lambda r: r.uniform(0.0, 1.0))
-        return
-
-    if algorithm == "DWA_CORAL_ANCHOR_ANNEAL":
-        # Same as ANCHOR plus a linear lambda anneal (lambda_0 -> lambda_min
-        # over anneal_steps). lambda_0 = dwa_coral_lambda.
-        _hparam("dwa_coral_lambda", 0.3,
-                lambda r: 10 ** r.uniform(-1.5, 0))
-        _hparam("dwa_coral_lambda_min", 0.05,
-                lambda r: r.choice([0.0, 0.02, 0.05, 0.1]))
-        _hparam("dwa_coral_anneal_steps", 1500,
-                lambda r: int(r.choice([1000, 1500, 2000])))
         _hparam("dwa_coral_beta", 0.0,
                 lambda r: r.choice([0.0, 1e-3, 1e-2]))
         _hparam("dwa_coral_tau", 1.0,

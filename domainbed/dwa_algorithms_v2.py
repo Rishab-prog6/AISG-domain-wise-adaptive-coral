@@ -42,13 +42,6 @@ in how the per-domain weights are computed and applied):
     used by the other variants is dragged by the abstract (Sketch/Cartoon)
     sources; anchoring on the easiest source preserves the natural-image
     manifold, which targets the Art/Photo test envs specifically.
-
-* DWA_CORAL_ANCHOR_ANNEAL
-    DWA_CORAL_ANCHOR_ALIGNONLY with the alignment weight linearly annealed
-    from dwa_coral_lambda to dwa_coral_lambda_min over dwa_coral_anneal_steps.
-    Strong early alignment builds the invariance the abstract test domains
-    need; easing it late frees the classifier to refit natural-image detail,
-    pulling Art/Photo back toward the ERM ceiling.
 """
 
 import torch
@@ -64,7 +57,6 @@ ALGORITHMS = [
     "DWA_CORAL_EMA",
     "DWA_CORAL_MIXED_LOSSGAP_ALIGNONLY",
     "DWA_CORAL_ANCHOR_ALIGNONLY",
-    "DWA_CORAL_ANCHOR_ANNEAL",
 ]
 
 
@@ -355,14 +347,6 @@ class DWA_CORAL_ANCHOR_ALIGNONLY(_DWACoralBase):
 
     weight_cls_loss = False  # informational; we override update()
 
-    def _coral_lambda(self):
-        """Effective alignment weight at the current step.
-
-        Constant for ANCHOR; subclasses (e.g. ANNEAL) override this to follow
-        a schedule. Logged each step as `coral_lambda`.
-        """
-        return self.hparams["dwa_coral_lambda"]
-
     def _other_weights(self, detached_losses, anchor_idx):
         """Return a length-n weight vector with 0 at anchor and a normalized
         (uniform / softmax) mix over the n-1 non-anchor positions."""
@@ -424,10 +408,9 @@ class DWA_CORAL_ANCHOR_ALIGNONLY(_DWACoralBase):
         cls_loss = domain_losses.mean()
         risk_var = torch.var(domain_losses, unbiased=False)
 
-        coral_lambda = self._coral_lambda()
         loss = (
             cls_loss
-            + coral_lambda * coral_loss
+            + self.hparams["dwa_coral_lambda"] * coral_loss
             + self.hparams["dwa_coral_beta"] * risk_var
         )
 
@@ -444,39 +427,8 @@ class DWA_CORAL_ANCHOR_ALIGNONLY(_DWACoralBase):
             "min_domain_loss": domain_losses.min().item(),
             "max_domain_loss": domain_losses.max().item(),
             "anchor_idx": anchor_idx,
-            "coral_lambda": float(coral_lambda),
         }
         for i in range(weights.shape[0]):
             metrics[f"weight_{i}"] = weights[i].item()
             metrics[f"coral_term_{i}"] = coral_terms[i].item()
         return metrics
-
-
-class DWA_CORAL_ANCHOR_ANNEAL(DWA_CORAL_ANCHOR_ALIGNONLY):
-    """Anchor alignment with a linearly annealed alignment weight.
-
-    Identical to DWA_CORAL_ANCHOR_ALIGNONLY except that `dwa_coral_lambda`
-    decays linearly from its full value to `dwa_coral_lambda_min` over the
-    first `dwa_coral_anneal_steps` steps, then holds:
-
-        lambda(t) = lambda_min
-                    + (lambda_0 - lambda_min) * max(0, 1 - t / anneal_steps)
-
-    Rationale: strong early alignment builds the domain-invariant feature
-    space that the abstract test domains (Sketch) rely on; easing the
-    alignment late lets the classifier refit natural-image detail, recovering
-    Art/Photo accuracy toward the ERM ceiling without discarding the
-    invariance learned earlier.
-    """
-
-    def _coral_lambda(self):
-        lambda_0 = self.hparams["dwa_coral_lambda"]
-        lambda_min = self.hparams["dwa_coral_lambda_min"]
-        anneal_steps = int(self.hparams["dwa_coral_anneal_steps"])
-
-        t = int(self.update_count.item())
-        if anneal_steps <= 0:
-            frac = 0.0
-        else:
-            frac = max(0.0, 1.0 - t / float(anneal_steps))
-        return lambda_min + (lambda_0 - lambda_min) * frac
