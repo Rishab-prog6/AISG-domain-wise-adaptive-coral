@@ -3,445 +3,637 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DWA-CORAL · 域自适应 CORAL 实验汇报</title>
+<title>DWA-CORAL · 实验汇报</title>
 <style>
-  :root{
-    --bg0:#0b1020; --bg1:#131a35; --ink:#eaf0ff; --mut:#9fb0d8;
-    --accent:#6ea8fe; --accent2:#b388ff; --good:#4ade80; --warn:#fbbf24;
-    --bad:#fb7185; --card:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
-    --glow:0 10px 40px rgba(110,168,254,.25);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{
-    font-family:-apple-system,"PingFang SC","Microsoft YaHei",Inter,Segoe UI,system-ui,sans-serif;
-    background:radial-gradient(1200px 800px at 80% -10%,#1c2750 0%,transparent 60%),
-               radial-gradient(900px 700px at -10% 110%,#2a1840 0%,transparent 55%),
-               linear-gradient(160deg,var(--bg0),var(--bg1));
-    color:var(--ink); overflow:hidden;
-  }
-  /* progress + counter */
-  #bar{position:fixed;top:0;left:0;height:3px;width:0;z-index:50;
-    background:linear-gradient(90deg,var(--accent),var(--accent2));
-    box-shadow:0 0 14px var(--accent);transition:width .4s ease}
-  #counter{position:fixed;bottom:18px;right:24px;z-index:50;font-size:13px;
-    color:var(--mut);letter-spacing:.08em}
-  #hint{position:fixed;bottom:18px;left:24px;z-index:50;font-size:12px;
-    color:var(--mut);opacity:.75}
-  kbd{background:var(--card);border:1px solid var(--line);border-radius:6px;
-    padding:1px 7px;font-size:11px;color:var(--ink)}
-  /* slides */
-  .deck{position:relative;height:100vh;width:100vw}
-  .slide{position:absolute;inset:0;display:flex;flex-direction:column;
-    justify-content:center;padding:6vh 8vw;opacity:0;visibility:hidden;
-    transform:translateY(24px) scale(.99);transition:opacity .5s ease,
-    transform .5s ease,visibility .5s;overflow-y:auto}
-  .slide.active{opacity:1;visibility:visible;transform:none}
-  .tag{display:inline-block;font-size:13px;letter-spacing:.18em;
-    text-transform:uppercase;color:var(--accent);margin-bottom:14px;font-weight:600}
-  h1{font-size:clamp(34px,6vw,76px);line-height:1.04;font-weight:800;
-    letter-spacing:-.02em;margin-bottom:18px}
-  h2{font-size:clamp(26px,3.6vw,46px);font-weight:780;letter-spacing:-.01em;
-    margin-bottom:22px;line-height:1.12}
-  h2 .em{background:linear-gradient(90deg,var(--accent),var(--accent2));
-    -webkit-background-clip:text;background-clip:text;color:transparent}
-  p,li{font-size:clamp(15px,1.5vw,20px);color:var(--mut);line-height:1.6}
-  .lead{font-size:clamp(18px,2vw,26px);color:var(--ink);max-width:60ch}
-  .grid{display:grid;gap:18px;margin-top:8px}
-  .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
-    padding:20px 22px;backdrop-filter:blur(8px);box-shadow:var(--glow)}
-  .card h3{font-size:18px;color:var(--ink);margin-bottom:8px;font-weight:700}
-  .card.win{border-color:rgba(74,222,128,.5);
-    background:linear-gradient(180deg,rgba(74,222,128,.12),var(--card))}
-  .card.bad{border-color:rgba(251,113,133,.45);
-    background:linear-gradient(180deg,rgba(251,113,133,.10),var(--card))}
-  .pill{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;
-    border:1px solid var(--line);color:var(--mut);margin:3px 6px 3px 0}
-  .pill.good{color:var(--good);border-color:rgba(74,222,128,.4)}
-  .pill.bad{color:var(--bad);border-color:rgba(251,113,133,.4)}
-  .big{font-size:clamp(48px,9vw,120px);font-weight:850;letter-spacing:-.03em;
-    background:linear-gradient(90deg,var(--accent),var(--accent2));
-    -webkit-background-clip:text;background-clip:text;color:transparent}
-  code,.mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
-  pre{background:#070b18;border:1px solid var(--line);border-radius:12px;
-    padding:16px 18px;overflow-x:auto;font-size:14px;color:#cfe0ff;line-height:1.55}
-  .muted{color:var(--mut)} .ink{color:var(--ink)}
-  .arrow{color:var(--accent2);font-weight:800}
-  ul{margin-left:2px;list-style:none}
-  ul li{position:relative;padding-left:24px;margin:10px 0}
-  ul li::before{content:"▸";position:absolute;left:0;color:var(--accent);font-weight:800}
-  /* table */
-  table{width:100%;border-collapse:collapse;font-size:clamp(12px,1.3vw,16px);margin-top:6px}
-  th,td{padding:7px 10px;text-align:center;border-bottom:1px solid var(--line)}
-  th{color:var(--accent);font-weight:700;letter-spacing:.03em}
-  td:first-child,th:first-child{text-align:left;color:var(--ink)}
-  tr.hl td{background:linear-gradient(90deg,rgba(74,222,128,.14),transparent);
-    color:var(--ink);font-weight:700}
-  .best{color:var(--good);font-weight:800}
-  /* bar chart */
-  .chart{margin-top:10px}
-  .row{display:grid;grid-template-columns:230px 1fr 70px;align-items:center;
-    gap:14px;margin:9px 0}
-  .row .name{font-size:15px;color:var(--mut);text-align:right;white-space:nowrap}
-  .row .name.win{color:var(--good);font-weight:700}
-  .track{height:26px;background:rgba(255,255,255,.05);border-radius:8px;overflow:hidden}
-  .fill{height:100%;width:0;border-radius:8px;transition:width 1s cubic-bezier(.2,.8,.2,1);
-    background:linear-gradient(90deg,var(--accent),var(--accent2))}
-  .fill.gray{background:linear-gradient(90deg,#5b6b95,#7c8bb5)}
-  .fill.win{background:linear-gradient(90deg,#34d399,#4ade80);box-shadow:0 0 18px rgba(74,222,128,.5)}
-  .fill.erm{background:linear-gradient(90deg,#fbbf24,#f59e0b)}
-  .row .val{font-size:15px;color:var(--ink);font-weight:700;text-align:left}
-  .axis{font-size:12px;color:var(--mut);margin-top:6px;text-align:right}
-  /* anchor diagram */
-  .diagram{display:flex;align-items:center;justify-content:center;gap:34px;
-    flex-wrap:wrap;margin-top:18px}
-  .node{width:120px;height:120px;border-radius:18px;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;border:1px solid var(--line);
-    background:var(--card);text-align:center;font-size:14px;color:var(--mut)}
-  .node b{display:block;font-size:18px;color:var(--ink);margin-bottom:4px}
-  .node.anchor{border-color:var(--good);box-shadow:0 0 24px rgba(74,222,128,.4);color:var(--ink)}
-  .node.anchor b{color:var(--good)}
-  .flow{font-size:30px;color:var(--accent2)}
-  .footnote{margin-top:20px;font-size:14px;color:var(--mut);border-left:3px solid var(--warn);
-    padding-left:14px}
-  .kpis{display:flex;gap:28px;flex-wrap:wrap;margin-top:14px}
-  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;
-    padding:16px 22px;min-width:150px}
-  .kpi .n{font-size:34px;font-weight:850;color:var(--ink)}
-  .kpi .l{font-size:13px;color:var(--mut);margin-top:4px}
-  .reveal>*{opacity:0;transform:translateY(14px);transition:.5s}
-  .active .reveal>*{opacity:1;transform:none}
-  .active .reveal>*:nth-child(2){transition-delay:.08s}
-  .active .reveal>*:nth-child(3){transition-delay:.16s}
-  .active .reveal>*:nth-child(4){transition-delay:.24s}
-  .active .reveal>*:nth-child(5){transition-delay:.32s}
-  .active .reveal>*:nth-child(6){transition-delay:.40s}
+:root {
+  --bg:    #0a0f1e;
+  --bg1:   #0d1423;
+  --ink:   #dde8ff;
+  --sub:   #8a9fc4;
+  --dim:   #5a6e90;
+  --acc:   #5b9cf6;
+  --acc2:  #a78bfa;
+  --green: #34d399;
+  --amber: #f59e0b;
+  --red:   #f87171;
+  --teal:  #5eead4;
+  --line:  rgba(255,255,255,.08);
+  --line2: rgba(255,255,255,.14);
+  --card:  rgba(255,255,255,.04);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* progress */
+#bar {
+  position: fixed; top: 0; left: 0; height: 2px; width: 0; z-index: 50;
+  background: linear-gradient(90deg, var(--acc), var(--acc2));
+  transition: width .4s ease;
+}
+#ctr {
+  position: fixed; bottom: 18px; right: 22px; z-index: 50;
+  font-size: 11px; color: var(--dim); letter-spacing: .12em;
+  font-variant-numeric: tabular-nums;
+}
+#hint {
+  position: fixed; bottom: 18px; left: 22px; z-index: 50;
+  font-size: 11px; color: var(--dim);
+}
+kbd {
+  display: inline-block; border: 1px solid var(--line2); border-radius: 4px;
+  padding: 0 5px; font-size: 10px; color: var(--sub);
+}
+
+/* dots */
+#dots {
+  position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+  z-index: 50; display: flex; gap: 6px; align-items: center;
+}
+.dot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--line2);
+  cursor: pointer; transition: .25s; flex-shrink: 0;
+}
+.dot.on { background: var(--acc); width: 18px; border-radius: 3px; }
+.dot:hover:not(.on) { background: var(--sub); }
+
+/* deck */
+.deck { position: relative; height: 100vh; width: 100vw; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 5vh 7.5vw;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity .45s ease, transform .45s ease, visibility .45s;
+  overflow-y: auto;
+}
+.slide.on { opacity: 1; visibility: visible; pointer-events: auto; transform: none; }
+.slide .rev { width: min(100%, 1180px); margin: 0 auto; }
+.slide .rev > .eyebrow:first-child {
+  position: absolute; top: 6vh; left: 50%; transform: translateX(-50%);
+  width: 85vw; margin: 0; text-align: center;
+}
+.slide .rev > h1:first-of-type,
+.slide .rev > h2:first-of-type {
+  position: absolute; top: 8.7vh; left: 50%; transform: translateX(-50%);
+  width: 86vw; max-width: 1200px; text-align: center;
+}
+
+/* typography */
+.eyebrow {
+  font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--acc); font-weight: 600; margin-bottom: 10px;
+}
+h1 {
+  font-size: clamp(38px, 6vw, 78px); line-height: 1.02; font-weight: 820;
+  letter-spacing: -.02em; margin-bottom: 18px;
+}
+h2 {
+  font-size: clamp(30px, 4vw, 54px); font-weight: 780;
+  letter-spacing: -.01em; margin-bottom: 20px; line-height: 1.08;
+}
+.g { background: linear-gradient(90deg,var(--acc),var(--acc2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gr { background: linear-gradient(90deg,var(--green),var(--teal)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ga { background: linear-gradient(90deg,var(--amber),#fb923c); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gd { background: linear-gradient(90deg,var(--red),#fb923c); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+p, li { font-size: clamp(15px, 1.45vw, 19px); color: var(--sub); line-height: 1.72; }
+.lead { font-size: clamp(18px, 1.9vw, 25px); color: var(--ink); line-height: 1.55; max-width: 64ch; }
+b, strong { color: var(--ink); font-weight: 600; }
+
+ul { list-style: none; }
+ul li { padding-left: 18px; position: relative; margin: 7px 0; }
+ul li::before { content: "–"; position: absolute; left: 0; color: var(--dim); }
+
+/* layout helpers */
+.cols { display: grid; gap: 18px; }
+.c2 { grid-template-columns: 1fr 1fr; }
+.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.c32 { grid-template-columns: 3fr 2fr; }
+.c23 { grid-template-columns: 2fr 3fr; }
+
+.box {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 16px 18px;
+}
+.box h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.box.green { border-color: rgba(52,211,153,.3); background: rgba(52,211,153,.05); }
+.box.red   { border-color: rgba(248,113,113,.3); background: rgba(248,113,113,.05); }
+.box.amber { border-color: rgba(245,158,11,.3);  background: rgba(245,158,11,.05); }
+.box.blue  { border-color: rgba(91,156,246,.3);  background: rgba(91,156,246,.05); }
+
+/* code */
+code { font-family: "SF Mono","Cascadia Code",ui-monospace,Menlo,Consolas,monospace; font-size: .9em; }
+pre {
+  font-family: "SF Mono","Cascadia Code",ui-monospace,Menlo,Consolas,monospace;
+  background: #050810; border: 1px solid var(--line); border-radius: 8px;
+  padding: 13px 15px; font-size: 13.5px; color: #b8d4ff; line-height: 1.65;
+  overflow-x: auto; white-space: pre;
+}
+pre .c  { color: #4a5f7a; }
+pre .s  { color: var(--green); }
+pre .k  { color: var(--acc2); }
+pre .n  { color: var(--teal); }
+
+/* pills */
+.pill {
+  display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px;
+  border: 1px solid var(--line2); color: var(--sub); margin: 2px 3px 2px 0;
+}
+.pill.g  { color: var(--green); border-color: rgba(52,211,153,.35); }
+.pill.r  { color: var(--red);   border-color: rgba(248,113,113,.35); }
+.pill.a  { color: var(--amber); border-color: rgba(245,158,11,.35); }
+.pill.b  { color: var(--acc);   border-color: rgba(91,156,246,.35); }
+
+/* big numbers */
+.num {
+  font-size: clamp(42px,7vw,96px); font-weight: 860; letter-spacing: -.04em; line-height: 1;
+}
+
+/* table */
+table { width: 100%; border-collapse: collapse; font-size: clamp(12.5px,1.25vw,15px); }
+th, td { padding: 7px 10px; text-align: center; border-bottom: 1px solid var(--line); }
+th { color: var(--acc); font-weight: 600; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; }
+td:first-child, th:first-child { text-align: left; color: var(--ink); }
+tr.hl td { background: rgba(52,211,153,.07); font-weight: 600; color: var(--ink); }
+.best { color: var(--green); font-weight: 700; }
+tr.hl td.best { color: var(--green); font-weight: 700; }
+.worse { color: rgba(248,113,113,.8); }
+
+/* bar chart */
+.chart { margin-top: 8px; }
+.brow { display: grid; grid-template-columns: 210px 1fr 68px; gap: 10px; align-items: center; margin: 7px 0; }
+.brow .lbl { font-size: 14px; color: var(--sub); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brow .lbl.win { color: var(--green); font-weight: 600; }
+.track { height: 24px; background: rgba(255,255,255,.04); border-radius: 5px; overflow: hidden; }
+.fill { height: 100%; width: 0; border-radius: 5px; transition: width 1s cubic-bezier(.2,.8,.2,1); }
+.fill.def  { background: linear-gradient(90deg, #374872, #4a6099); }
+.fill.erm  { background: linear-gradient(90deg, #5b6bb0, #7c8fd4); }
+.fill.win  { background: linear-gradient(90deg, #16a34a, #34d399); box-shadow: 0 0 10px rgba(52,211,153,.35); }
+.brow .v   { font-size: 14px; color: var(--ink); font-weight: 600; }
+.axis-lbl  { font-size: 11px; color: var(--dim); margin-top: 3px; text-align: right; }
+
+/* kpi row */
+.kpis { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 12px 18px; min-width: 130px; }
+.kpi .n { font-size: 30px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; }
+.kpi .l { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
+/* iteration chain */
+.chain { display: flex; flex-direction: column; gap: 2px; position: relative; padding-left: 28px; }
+.chain::before {
+  content: ''; position: absolute; left: 9px; top: 14px; bottom: 14px;
+  width: 1px; background: var(--line2);
+}
+.cstep { display: flex; align-items: flex-start; gap: 12px; padding: 6px 0; }
+.cstep .dot2 {
+  width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+  background: var(--bg); z-index: 1; position: relative; left: -28px;
+}
+.cstep .body { margin-left: -16px; }
+.cstep .title { font-size: 15px; font-weight: 600; color: var(--ink); }
+.cstep .detail { font-size: 13.5px; color: var(--sub); margin-top: 2px; line-height: 1.58; }
+
+/* note / footnote */
+.note {
+  margin-top: 14px; font-size: 14px; color: var(--sub);
+  border-left: 2px solid var(--line2); padding-left: 12px; line-height: 1.62;
+}
+.note.green { border-color: rgba(52,211,153,.4); }
+.note.red   { border-color: rgba(248,113,113,.4); }
+.note.amber { border-color: rgba(245,158,11,.4); }
+
+/* anchor diagram */
+.adiag { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+.anode {
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); padding: 11px 15px; text-align: center;
+  font-size: 13px; color: var(--sub); min-width: 110px;
+}
+.anode strong { display: block; font-size: 15px; color: var(--ink); margin-bottom: 3px; }
+.anode.anchor {
+  border-color: rgba(52,211,153,.45);
+  background: rgba(52,211,153,.06);
+  box-shadow: 0 0 16px rgba(52,211,153,.15);
+}
+.anode.anchor strong { color: var(--green); }
+.aarr { color: var(--dim); font-size: 13px; writing-mode: vertical-rl; letter-spacing: 2px; }
+
+/* thumbnail overlay */
+#tov {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(8,13,25,.93); backdrop-filter: blur(10px);
+  display: none; flex-wrap: wrap; gap: 10px;
+  padding: 44px 28px; align-content: flex-start; overflow-y: auto;
+}
+#tov.on { display: flex; }
+.thumb {
+  width: 170px; height: 100px; border-radius: 8px; overflow: hidden;
+  cursor: pointer; border: 1.5px solid var(--line);
+  position: relative; flex-shrink: 0; background: var(--bg1);
+  transition: border-color .2s;
+}
+.thumb:hover, .thumb.on { border-color: var(--acc); }
+.tnum { position: absolute; top: 5px; left: 7px; font-size: 10px; color: var(--dim); }
+.tlbl {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,.55); font-size: 10px; color: var(--ink);
+  padding: 3px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#tov-esc { position: absolute; top: 14px; right: 18px; font-size: 11px; color: var(--dim); }
+
+/* reveal */
+.rev > * { opacity: 0; transform: translateY(12px); transition: .5s ease; }
+.on .rev > * { opacity: 1; transform: none; }
+.on .rev > *:nth-child(2) { transition-delay: .06s; }
+.on .rev > *:nth-child(3) { transition-delay: .12s; }
+.on .rev > *:nth-child(4) { transition-delay: .18s; }
+.on .rev > *:nth-child(5) { transition-delay: .24s; }
+.on .rev > *:nth-child(6) { transition-delay: .30s; }
+.on .rev > *:nth-child(7) { transition-delay: .36s; }
 </style>
 </head>
 <body>
 <div id="bar"></div>
-<div id="counter">01 / 14</div>
-<div id="hint">← → / 空格翻页 · <kbd>F</kbd> 全屏</div>
+<div id="ctr">01 / 12</div>
+<div id="hint">← → 翻页 &nbsp;·&nbsp; <kbd>Tab</kbd> 总览 &nbsp;·&nbsp; <kbd>F</kbd> 全屏</div>
+<div id="dots"></div>
+<div id="tov"><div id="tov-esc"><kbd>Esc</kbd> 关闭</div></div>
 
 <div class="deck" id="deck">
+<!-- 01 TITLE -->
+<section class="slide"><div class="rev">
+  <div class="eyebrow">AI Safety · Domain Generalization · DomainBed</div>
+  <h1>Domain-Wise Adaptive <span class="g">CORAL</span></h1>
+  <p class="lead" style="margin-bottom:18px">本报告重点比较 <strong>原版 CORAL</strong> 和最终的 <strong>ANCHOR</strong> 版本：CORAL 提供什么，ANCHOR 改了什么，以及为什么 Art 变好、Cartoon 变差。</p>
+  <div class="kpis"><div class="kpi"><div class="n">CORAL</div><div class="l">原版协方差对齐</div></div><div class="kpi"><div class="n">ANCHOR</div><div class="l">最终锚定对齐</div></div><div class="kpi"><div class="n">+1.47</div><div class="l">Art vs CORAL</div></div><div class="kpi"><div class="n">−1.49</div><div class="l">Cartoon vs CORAL</div></div></div>
+  <div class="note amber" style="margin-top:18px">结论保持克制：ANCHOR 的 Avg 与 CORAL 基本打平。它的价值不是全面超越，而是改变 CORAL 的域间取舍：Art 被救回一部分，Cartoon 付出代价。</div>
+</div></section>
 
-  <!-- 1 TITLE -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag">AI 安全 · 分布外泛化 · DomainBed</div>
-      <h1>Domain-Wise<br>Adaptive <span class="em">CORAL</span></h1>
-      <p class="lead">从一个只有 20% 的失败实现，到一个有解释性的"锚定单向对齐"方法——
-        一次完整的 <span class="ink">诊断 → 修复 → 改进 → 取舍</span> 研究。</p>
-      <div class="kpis">
-        <div class="kpi"><div class="n">20% → 80%</div><div class="l">修复尺度 bug 后的准确率</div></div>
-        <div class="kpi"><div class="n">6</div><div class="l">设计并实现的变体</div></div>
-        <div class="kpi"><div class="n">2</div><div class="l">数据集 PACS · VLCS</div></div>
-      </div>
-    </div>
-  </section>
+<!-- 02 SETTING -->
+<section class="slide"><div class="rev">
+  <div class="eyebrow">问题设定</div>
+  <h2>训练在源域，测试在<span class="g">未见目标域</span></h2>
+  <p class="lead">Domain Generalization 要求模型只看多个源域训练，直接泛化到没见过的目标域。</p>
+  <div class="cols c2" style="margin-top:16px; gap:14px"><div class="box blue"><h3>PACS</h3><p>Art Painting、Cartoon、Photo、Sketch。风格差异很大，适合观察 CORAL 对风格偏移的作用。</p><p style="margin-top:8px">Art/Photo 更接近自然图像；Cartoon/Sketch 更抽象。</p></div><div class="box"><h3>VLCS</h3><p>Caltech101、LabelMe、SUN09、VOC2007。四个域都是真实照片，域差异更多来自采集偏差。</p><p style="margin-top:8px">因此 VLCS 上 ERM 本身很强，对齐方法未必提高 Avg。</p></div></div>
+  <div class="note" style="margin-top:14px">协议：leave-one-domain-out；指标：每个目标域准确率、Avg、Worst。本文重点解释 PACS 中 Art 与 Cartoon 的变化。</div>
+</div></section>
 
-  <!-- 2 SETTING -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag">问题设定</div>
-      <h2>在<span class="em"> 没见过的域 </span>上直接测试</h2>
-      <p class="lead">模型只在若干<b class="ink">源域</b>训练，要在一个训练中<b class="ink">从未见过的目标域</b>上直接评测，不许微调。这正是 AI 安全里"分布外鲁棒性"的核心。</p>
-      <div class="grid g2" style="margin-top:22px">
-        <div class="card"><h3>PACS（主战场）</h3>
-          <p>同样 7 类物体，4 种画风差异极大的域：</p>
-          <span class="pill">Art 艺术画</span><span class="pill">Cartoon 卡通</span>
-          <span class="pill">Photo 照片</span><span class="pill">Sketch 素描</span></div>
-        <div class="card"><h3>VLCS（迁移验证）</h3>
-          <p>风格差异较小的 4 个域，用来检验方法是否通用：</p>
-          <span class="pill">Caltech101</span><span class="pill">LabelMe</span>
-          <span class="pill">SUN09</span><span class="pill">VOC2007</span></div>
-      </div>
-      <ul style="margin-top:18px">
-        <li><b class="ink">协议</b>：留一域测试（leave-one-domain-out），4 个域各跑一次</li>
-        <li><b class="ink">指标</b>：<b class="ink">Avg</b> = 整体泛化 ·
-          <b class="ink">Worst</b> = 最差域（鲁棒性下界，安全更关心）</li>
-        <li><b class="ink">配置</b>：ResNet-18 · 3000 steps · 不改动 DomainBed 官方文件</li>
-      </ul>
-    </div>
-  </section>
+<!-- 03 CORE QUESTION -->
+<section class="slide"><div class="rev">
+  <div class="eyebrow">核心问题</div>
+  <h2>从 CORAL 到 ANCHOR：<span class="g">不是换模型，而是换对齐方式</span></h2>
+  <p class="lead">我们保留 CORAL 的思想：用特征协方差对齐减少域风格差异。但重新审视两个问题。</p>
+  <div class="cols c2" style="margin-top:16px; gap:14px"><div class="box blue"><h3>对齐项是否在正确尺度？</h3><p>协方差矩阵是 <code>d × d</code>，直接用 Frobenius 范数会让 CORAL 项过大。最终实现使用 <code>/(4d²)</code> 标准缩放。</p></div><div class="box green"><h3>应该对齐到谁？</h3><p>原版 CORAL 对齐到平均协方差 <code>C̄</code>。ANCHOR 改为对齐到最低损失源域的 <code>detach(C_anchor)</code>。</p></div></div>
+</div></section>
 
-  <!-- 3 IDEA -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag">出发点</div>
-      <h2>源域有<span class="em"> 难有易</span>，<br>能不能<span class="em"> 自适应地 </span>分配权重？</h2>
-      <p class="lead"><b class="ink">CORAL</b> 让各源域的特征<b class="ink">协方差对齐</b>，逼近域不变表征——但它对所有域"一视同仁"。</p>
-      <p class="lead" style="margin-top:14px">我们的假设：Sketch 远比 Photo 难，按难度加权应当更好。这就是 <b class="ink">Domain-Wise Adaptive</b>：</p>
-      <pre style="margin-top:18px">w_e = softmax(τ · detach(L_e))     # 损失越大的域，权重越大</pre>
-    </div>
-  </section>
+<!-- 04 CORAL BASELINE -->
+<section class="slide"><div class="rev">
+  <div class="eyebrow">原版 CORAL · 机制</div>
+  <h2>CORAL 的核心：<span class="g">分类 + 协方差对齐</span></h2>
+  <p class="lead">CORAL 不是换掉分类器，而是在 ERM 分类损失之外，加一个让源域特征分布更接近的正则项。</p>
+  <div class="cols c2" style="margin-top:16px; gap:14px"><div class="box blue"><h3>目标函数</h3><pre style="font-size:13.5px">loss = mean_e CE(f(x_e), y_e)
+     + λ · mean_e || C_e - C̄ ||²_F / (4d²)</pre><p style="margin-top:8px"><code>C_e</code> 是第 e 个源域的特征协方差，<code>C̄</code> 是所有源域协方差的平均。</p></div><div class="box green"><h3>它为什么有效</h3><p>如果不同域的二阶统计量接近，分类器更难依赖某个域独有的纹理、颜色或画风。</p><p style="margin-top:8px">在本次 PACS 单种子结果中，CORAL 使 Sketch 从 ERM 73.50 到 79.49。</p></div></div>
+  <div class="note amber" style="margin-top:14px">代价：平均协方差目标 <code>C̄</code> 会被 Sketch/Cartoon 这类抽象域拉偏，因此 Art 这种更自然的域可能被伤到：ERM 81.17 → CORAL 78.24。</div>
+</div></section>
 
-  <!-- 4 THE 20% DISASTER -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag" style="color:var(--bad)">翻车现场</div>
-      <h2>第一版只有 <span class="big" style="font-size:clamp(40px,8vw,90px)">~20%</span></h2>
-      <p class="lead">PACS 是 7 类分类，随机猜测约 14%。模型几乎<b class="ink">没在学分类</b>。</p>
-      <div class="card bad" style="margin-top:22px">
-        <h3>总损失长这样：</h3>
-        <pre>loss = Σ w_e·L_e
-     + λ · Σ w_e · ‖C_e − C̄‖_F²     ← 问题就在这一项
-     + β · Var(L_e)</pre>
-      </div>
-      <p class="footnote">逻辑完全正确，但有一个隐蔽的<b class="ink">数值尺度</b>错误……（下一页）</p>
-    </div>
-  </section>
+<!-- 05 ANCHOR METHOD -->
+<section class="slide"><div class="rev">
+  <div class="eyebrow">最终方法 · DWA_CORAL_ANCHOR_ALIGNONLY</div>
+  <h2>ANCHOR 的改动：<span class="gr">对齐到锚点，而不是平均值</span></h2>
+  <p class="lead">每一步选择当前最低损失的源域作为锚点，其他源域单向向它对齐。</p>
+  <div class="cols c3" style="margin-top:14px; gap:12px"><div class="box blue"><h3>分类不加权</h3><p><code>cls_loss = mean_e L_e</code>，避免因为难域 loss 高而扭曲监督信号。</p></div><div class="box green"><h3>锚点 detach</h3><p><code>C_anchor</code> 只作为目标，不被对齐梯度拉动，保留判别性。</p></div><div class="box amber"><h3>非锚域自适应</h3><p>对齐权重混合均匀权重和 loss softmax，困难域获得更多对齐压力。</p></div></div>
+  <pre style="margin-top:14px; font-size:13.5px">anchor = argmin_e detach(L_e)
+coral_e = || C_e - detach(C_anchor) ||²_F / (4d²)
+cls_loss = mean_e L_e</pre>
+</div></section>
 
-  <!-- 5 ROOT CAUSE -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag" style="color:var(--bad)">根因诊断</div>
-      <h2>损失<span class="em"> 尺度不匹配</span></h2>
-      <div class="grid g2" style="margin-top:10px">
-        <div class="card bad"><h3>对齐项 ‖C_e − C̄‖²_F</h3>
-          <div class="big" style="font-size:clamp(34px,6vw,64px)">10⁴ ~ 10⁶</div>
-          <p>512×512 协方差矩阵，Frobenius 范数平方天然是 O(d²) 量级</p></div>
-        <div class="card"><h3>分类损失 L_e</h3>
-          <div class="big" style="font-size:clamp(34px,6vw,64px)">≈ 2</div>
-          <p>交叉熵的正常范围</p></div>
-      </div>
-      <ul style="margin-top:20px">
-        <li>即便 λ=1e-3，对齐项仍有 10²~10³ 的有效权重 → <b class="ink">把分类损失彻底淹没</b></li>
-        <li>梯度几乎全用来"把协方差拉平"（退化解：所有特征塌成一个点）</li>
-        <li>这是多正则项训练里非常常见、却很隐蔽的 <b class="ink">scale mismatch</b> bug</li>
-      </ul>
-    </div>
-  </section>
+<!-- 06 ANCHOR INTUITION -->
+<section class="slide"><div class="rev">
+  <div class="eyebrow">ANCHOR · 为什么 Art 变好、Cartoon 变差</div>
+  <h2>它改变的是<span class="gr">对齐的方向</span></h2>
+  <div class="cols c2" style="margin-top:14px; gap:14px"><div class="box green"><h3>Art 为什么变好</h3><p>Art 更接近自然图像流形。原版 CORAL 的平均目标被 Sketch/Cartoon 拉向抽象风格；ANCHOR 用低损失源域做参照，减少了这种拉偏，所以 Art 从 CORAL 的 78.24 回到 79.71。</p></div><div class="box amber"><h3>Cartoon 为什么变差</h3><p>Cartoon 是更抽象的域。ANCHOR 的锚点通常更偏自然图像，Cartoon 被拉向这个参照后，自己的风格特征被压缩，所以从 CORAL 的 76.28 降到 74.79。</p></div></div>
+  <div class="note" style="margin-top:14px">Photo 和 Sketch 相比 CORAL 基本不变；主要变化是把 CORAL 的代价从 Art 转移到 Cartoon。</div>
+</div></section>
 
-  <!-- 6 THE FIX -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag" style="color:var(--good)">修复 · DWA_CORAL_v2</div>
-      <h2>三处修复，<span class="em"> 20% → 80%</span></h2>
-      <div class="grid g3" style="margin-top:10px">
-        <div class="card win"><h3>① CORAL 标准归一化</h3>
-          <p>除以 <code>4·d²</code>（CORAL 原论文缩放）。coral_loss 从 ~1e5 → ~1e-7，λ 放回 ~1.0</p></div>
-        <div class="card"><h3>② 稳定 softmax</h3>
-          <p>先减最大值再指数，<code>τ·L</code> 大时不溢出</p></div>
-        <div class="card"><h3>③ Warmup</h3>
-          <p>前 100 步用均匀权重，分类器先平等见过每个域</p></div>
-      </div>
-      <div class="kpis" style="margin-top:24px">
-        <div class="kpi"><div class="n" style="color:var(--bad)">20%</div><div class="l">修复前</div></div>
-        <div class="kpi"><div class="n arrow" style="font-size:34px">→</div><div class="l">&nbsp;</div></div>
-        <div class="kpi"><div class="n" style="color:var(--good)">80.08%</div><div class="l">修复后 PACS Avg，追平基线</div></div>
-      </div>
-    </div>
-  </section>
 
-  <!-- 7 NEW PROBLEM -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag" style="color:var(--warn)">新问题</div>
-      <h2>救活了，但<span class="em"> 没赢 </span>CORAL</h2>
-      <ul style="margin-top:8px">
-        <li>v2（Avg 80.08）≈ CORAL（80.81），基本打平</li>
-        <li>相对 ERM 在 Sketch 上的提升，<b class="ink">主要来自 CORAL 对齐本身</b>，不是自适应加权</li>
-        <li>在<b class="ink">分类损失</b>上加权 → 过度偏向难域 → 反而拖累 <span class="pill bad">Cartoon</span><span class="pill bad">Photo</span></li>
-      </ul>
-      <div class="card" style="margin-top:22px">
-        <h3>诊断</h3>
-        <p>加权的想法没错，<b class="ink">加权对象错了</b>：不该扭曲分类监督（简单域会学不好），
-          应该只作用在 <b class="ink">对齐项</b> 上。 → 引出变体研究。</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 8 VARIANT GALLERY -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag">变体研究 · 6 个轻量变体</div>
-      <h2>权重<span class="em"> 怎么算、作用在哪</span></h2>
-      <div class="grid g3" style="margin-top:6px">
-        <div class="card"><h3>ALIGNONLY</h3><p>分类用 ERM 均值，<b class="ink">只</b>在对齐上自适应</p></div>
-        <div class="card"><h3>CLIPPED</h3><p>权重裁剪到 [0.15, 0.60]，防单域独大</p></div>
-        <div class="card"><h3>EMA</h3><p>用损失的滑动平均去噪</p></div>
-        <div class="card"><h3>MIXED_LOSSGAP</h3><p>权重 = 均匀 ⊕ softmax(损失 + 协方差差)</p></div>
-        <div class="card win"><h3>⭐ ANCHOR_ALIGNONLY</h3><p>锚定最易域，其它域<b class="ink">单向对齐到它</b></p></div>
-        <div class="card bad"><h3>ANCHOR_ANNEAL</h3><p>对齐强度随训练衰减 —— <b class="ink">更差，已回退</b></p></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 9 ANCHOR MECHANISM -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag" style="color:var(--good)">核心机制</div>
-      <h2>为什么<span class="em"> 锚定最易域 </span>有效？</h2>
-      <p class="lead">其它变体都对齐到<b class="ink">平均协方差 C̄</b>——但 C̄ 被抽象域(Sketch/Cartoon)带偏，
-        把自然图像(Photo/Art)往抽象方向拉，正好伤害 Art/Photo。</p>
-      <div class="diagram">
-        <div class="node anchor"><b>Photo</b>锚 anchor<br>detach</div>
-        <div class="flow">←</div>
-        <div class="node"><b>Sketch</b>对齐到锚</div>
-        <div class="node"><b>Cartoon</b>对齐到锚</div>
-      </div>
-      <ul style="margin-top:20px">
-        <li>每步选<b class="ink">损失最低</b>的源域当锚（通常正是最"自然图像"的域），detach 其协方差</li>
-        <li>锚的特征<b class="ink">只接受分类梯度</b> → 保住自然图像判别流形（救 Art/Photo）</li>
-        <li>其它域往锚靠拢 → 仍得到域不变性（保住 Sketch）</li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- 10 PACS RESULTS -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag">结果 · PACS Avg（ResNet-18, 3000 steps）</div>
-      <h2>整体<span class="em"> 追平 CORAL</span>，Art 领先所有对齐法</h2>
-      <div class="chart" id="pacsChart">
-        <!-- rows injected by JS -->
-      </div>
-      <div class="axis">横轴：Avg 准确率（缩放区间 55–82%，仅为放大差异）</div>
-      <p class="footnote">ANCHOR：Art <b class="ink">79.71</b>（对齐法最高）· Sketch <b class="ink">79.49</b>（=CORAL 最好）·
-        Avg <b class="ink">80.80</b> ≈ CORAL 80.81 —— 在难/易域之间取得更好平衡。</p>
-    </div>
-  </section>
-
-  <!-- 11 PACS TABLE -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag">结果 · PACS 全表</div>
-      <h2>逐域<span class="em"> 拆解</span></h2>
-      <table>
-        <tr><th>Method</th><th>Art</th><th>Cartoon</th><th>Photo</th><th>Sketch</th><th>Avg</th><th>Worst</th></tr>
-        <tr><td>ERM</td><td class="best">81.17</td><td>75.64</td><td class="best">93.11</td><td>73.50</td><td class="best">80.86</td><td>73.50</td></tr>
-        <tr><td>CORAL</td><td>78.24</td><td>76.28</td><td>89.22</td><td class="best">79.49</td><td>80.81</td><td class="best">76.28</td></tr>
-        <tr><td>GroupDRO</td><td>77.75</td><td>76.50</td><td>88.92</td><td>75.54</td><td>79.68</td><td>75.54</td></tr>
-        <tr><td>IRM</td><td>43.03</td><td>60.47</td><td>71.26</td><td>57.20</td><td>57.99</td><td>43.03</td></tr>
-        <tr><td>Mixup</td><td>78.97</td><td class="best">77.56</td><td>92.81</td><td>69.81</td><td>79.79</td><td>69.81</td></tr>
-        <tr><td>DWA_CORAL_v2</td><td>79.46</td><td>75.00</td><td>88.92</td><td>76.94</td><td>80.08</td><td>75.00</td></tr>
-        <tr><td>DWA_CORAL_v2_rerun</td><td>79.22</td><td>75.64</td><td>89.82</td><td>77.45</td><td>80.53</td><td>75.64</td></tr>
-        <tr><td>DWA_CORAL_ALIGNONLY</td><td>78.97</td><td>74.15</td><td>89.22</td><td>78.47</td><td>80.20</td><td>74.15</td></tr>
-        <tr class="hl"><td>★ ANCHOR_ALIGNONLY</td><td>79.71</td><td>74.79</td><td>89.22</td><td>79.49</td><td>80.80</td><td>74.79</td></tr>
-      </table>
-      <p class="footnote">软肋：Cartoon(74.79) 成最差域，故 Worst 略低于 CORAL。ERM 的 Art/Photo 是天花板（完全不对齐），但 Sketch 仅 73.50。</p>
-    </div>
-  </section>
-
-  <!-- 12 VLCS -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag">迁移验证 · VLCS（ResNet-18, 3000 steps）</div>
-      <h2>换数据集，<span class="em"> 机制依然成立</span></h2>
-      <table>
-        <tr><th>Method</th><th>Caltech</th><th>LabelMe</th><th>SUN09</th><th>VOC2007</th><th>Avg</th><th>Worst</th></tr>
-        <tr><td>ERM</td><td class="best">95.76</td><td class="best">64.03</td><td>64.63</td><td class="best">71.26</td><td class="best">73.92</td><td class="best">64.03</td></tr>
-        <tr><td>CORAL</td><td>92.93</td><td>60.45</td><td>65.40</td><td>68.15</td><td>71.73</td><td>60.45</td></tr>
-        <tr><td>GroupDRO</td><td>80.57</td><td>61.21</td><td class="best">67.84</td><td>68.74</td><td>69.59</td><td>61.21</td></tr>
-        <tr><td>IRM</td><td>88.34</td><td>54.24</td><td>58.84</td><td>54.37</td><td>63.95</td><td>54.24</td></tr>
-        <tr><td>Mixup</td><td>74.91</td><td>63.47</td><td>63.11</td><td>69.63</td><td>67.78</td><td>63.11</td></tr>
-        <tr class="hl"><td>★ ANCHOR_ALIGNONLY</td><td>86.57</td><td>59.13</td><td>68.60</td><td>69.78</td><td>71.02</td><td>59.13</td></tr>
-      </table>
-      <ul style="margin-top:16px">
-        <li>Avg <b class="ink">71.02</b> 与 CORAL(71.73) <b class="ink">同档</b>，并在 <b class="ink">SUN09(68.60，全场最高)</b> 与 VOC2007 上超过 CORAL</li>
-        <li>说明锚定对齐不是只在 PACS 上"过拟合调参"，有一定通用性</li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- 13 ANNEAL FAILURE -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag" style="color:var(--bad)">诚实的负结果</div>
-      <h2>退火 <span class="em">ANNEAL</span>：试过，更差，回退</h2>
-      <p class="lead">假设：前期强对齐建不变性，后期衰减 λ 让分类器重拾自然图像细节、把 Art 拉回。</p>
-      <pre style="margin-top:16px">λ(t) = λ_min + (λ_0 − λ_min) · max(0, 1 − t/anneal_steps)</pre>
-      <div class="card bad" style="margin-top:18px">
-        <h3>实测：分数反而更差 → 已用 git revert 干净回退</h3>
-        <p>后期放松对齐后，早期学到的不变性<b class="ink">没能保持</b>：Sketch 掉了，Art 也没补回来。
-          结论：<b class="ink">域不变性需要持续的对齐压力来维持。</b></p>
-      </div>
-      <p class="footnote">⚠️ 统计学注脚：PACS 单种子域级波动约 ±1%。ANCHOR vs CORAL 的 Avg(80.80 vs 80.81) 在噪声范围内，
-        不宣称显著超越 —— 需 ≥3 种子复现确认。</p>
-    </div>
-  </section>
-
-  <!-- 14 CONCLUSION -->
-  <section class="slide">
-    <div class="reveal">
-      <div class="tag" style="color:var(--good)">结论 & 未来</div>
-      <h2>我们<span class="em"> 做了什么</span></h2>
-      <div class="grid g2">
-        <div class="card win"><h3>贡献</h3>
-          <ul style="margin-top:4px">
-            <li>定位并修复"损失尺度"致命 bug（20%→80%）</li>
-            <li>系统化 6 变体研究，对症"加权对象"诊断</li>
-            <li>提出有解释性的<b class="ink">锚定单向对齐</b>，平衡难/易域</li>
-            <li>VLCS 上验证可迁移性 + 一个诚实的负结果</li>
-          </ul></div>
-        <div class="card"><h3>未来工作</h3>
-          <ul style="margin-top:4px">
-            <li><b class="ink">多种子</b>(≥3) 复现，给均值±方差</li>
-            <li><b class="ink">类条件 CORAL</b>：保住类间结构</li>
-            <li>更优的锚选择策略 / 多锚平均</li>
-            <li>OfficeHome · DomainNet 等更大基准</li>
-          </ul></div>
-      </div>
-      <pre style="margin-top:18px">python -u -m domainbed.scripts.dwa_train_v2 \
-  --algorithm DWA_CORAL_ANCHOR_ALIGNONLY --dataset PACS --test_env 0 \
-  --steps 3000 --hparams '{"resnet18": true, "dwa_coral_lambda": 0.3, ...}'</pre>
-      <p style="margin-top:14px;text-align:center;font-size:18px;color:var(--ink)">谢谢观看 · Questions?</p>
-    </div>
-  </section>
-
+<!-- ─────────────────────── 01 TITLE ─────────────────────── -->
+<section class="slide">
+<div class="rev">
+  <div class="eyebrow">结果 · PACS Art（ResNet-18, 3000 steps）</div>
+  <h2>关键亮点：ANCHOR 把 <span class="gr">Art 从 CORAL 的损失里追回来</span></h2>
+  <div class="chart" id="pacsChart"></div>
+  <div class="axis-lbl">横轴缩放至 40–82%，用于放大 Art 域差异</div>
+  <div class="note green" style="margin-top:10px">
+    原版 CORAL 在 Art 上是 78.24；ANCHOR 提到 <strong>79.71</strong>，提升 <strong>+1.47</strong>。Photo 和 Sketch 相比 CORAL 基本不变，所以这页重点看 Art 的恢复。
+  </div>
+  <div class="note" style="margin-top:10px">
+    为什么 Art 变好：Art 比 Cartoon/Sketch 更接近自然图像流形。原版 CORAL 的平均协方差目标会被抽象域拉偏，Art 特征被往抽象方向拉；ANCHOR 选择最低损失源域作为 detached 目标，等于给对齐保留一个更稳定、更自然的参照点，所以 Art 被少伤一点。
+  </div>
 </div>
+</section>
+<!-- ─────────────────────── 08 PACS TABLE ─────────────────────── ─────────────────────── -->
+<section class="slide">
+<div class="rev">
+  <div class="eyebrow">结果 · PACS 逐域</div>
+  <h2>ANCHOR 的<span class="g"> 取舍在哪</span></h2>
+  <table>
+    <tr><th>方法</th><th>Art</th><th>Cartoon</th><th>Photo</th><th>Sketch</th><th>Avg</th><th>Worst</th></tr>
+    <tr><td>ERM</td><td class="best">81.17</td><td>75.64</td><td class="best">93.11</td><td>73.50</td><td class="best">80.86</td><td>73.50</td></tr>
+    <tr><td>CORAL</td><td>78.24</td><td>76.28</td><td>89.22</td><td class="best">79.49</td><td>80.81</td><td class="best">76.28</td></tr>
+    <tr><td>GroupDRO</td><td>77.75</td><td>76.50</td><td>88.92</td><td>75.54</td><td>79.68</td><td>75.54</td></tr>
+    <tr><td>Mixup</td><td>78.97</td><td class="best">77.56</td><td>92.81</td><td>69.81</td><td>79.79</td><td>69.81</td></tr>
+    <tr><td>IRM</td><td>43.03</td><td>60.47</td><td>71.26</td><td>57.20</td><td>57.99</td><td>43.03</td></tr>
+    <tr><td>DWA v2</td><td>79.46</td><td>75.00</td><td>88.92</td><td>76.94</td><td>80.08</td><td>75.00</td></tr>
+    <tr><td>DWA v2 rerun</td><td>79.22</td><td>75.64</td><td>89.82</td><td>77.45</td><td>80.53</td><td>75.64</td></tr>
+    <tr><td>DWA ALIGNONLY</td><td>78.97</td><td>74.15</td><td>89.22</td><td>78.47</td><td>80.20</td><td>74.15</td></tr>
+    <tr class="hl"><td>DWA ANCHOR ←</td><td class="best">79.71</td><td>74.79</td><td>89.22</td><td class="best">79.49</td><td>80.80</td><td>74.79</td></tr>
+  </table>
+
+    <div class="cols c2" style="margin-top:12px; gap:10px">
+    <div class="box green">
+      <p style="font-size:14px"><strong>为什么 Art 变好：</strong>
+      Art <span class="best">+1.47</span> vs CORAL。ANCHOR 不再让 Art 对齐到被 Sketch/Cartoon 拉偏的平均协方差，而是对齐到更稳定的低损失源域，因此自然图像判别结构保留得更多。</p>
+    </div>
+    <div class="box amber">
+      <p style="font-size:14px"><strong>为什么 Cartoon 变差：</strong>
+      Cartoon <span class="worse">−1.49</span> vs CORAL。锚点通常更偏 Art/Photo 这种自然图像域，Cartoon 作为抽象域被拉向自然图像参照后，自己的风格特征被压缩，所以它付出了主要代价。</p>
+    </div>
+  </div>
+  <div class="note" style="margin-top:10px">
+    Photo 和 Sketch 与 CORAL 基本持平，说明 ANCHOR 的主要变化不是整体抬升，而是把原版 CORAL 的取舍从“牺牲 Art”改成“牺牲一部分 Cartoon”。
+  </div></div>
+</section>
+
+<!-- ─────────────────────── 13 VLCS CHART ─────────────────────── -->
+<section class="slide">
+<div class="rev">
+  <div class="eyebrow">迁移验证 · VLCS Avg（ResNet-18, 3000 steps）</div>
+  <h2>VLCS 上看到<span class="gr"> 相似信号与边界</span></h2>
+  <div class="chart" id="vlcsChart"></div>
+  <div class="axis-lbl">横轴缩放至 58–75%</div>
+
+  <table style="margin-top:12px; font-size:13px">
+    <tr><th>方法</th><th>Caltech101</th><th>LabelMe</th><th>SUN09</th><th>VOC2007</th><th>Avg</th></tr>
+    <tr><td>ERM</td><td class="best">95.76</td><td class="best">64.03</td><td>64.63</td><td class="best">71.26</td><td class="best">73.92</td></tr>
+    <tr><td>CORAL</td><td>92.93</td><td>60.45</td><td>65.40</td><td>68.15</td><td>71.73</td></tr>
+    <tr class="hl"><td>DWA ANCHOR ←</td><td>86.57</td><td>59.13</td><td class="best">68.60</td><td>69.78</td><td>71.02</td></tr>
+    <tr><td>GroupDRO</td><td>80.57</td><td>61.21</td><td>67.84</td><td>68.74</td><td>69.59</td></tr>
+    <tr><td>Mixup</td><td>74.91</td><td>63.47</td><td>63.11</td><td>69.63</td><td>67.78</td></tr>
+    <tr><td>IRM</td><td>88.34</td><td>54.24</td><td>58.84</td><td>54.37</td><td>63.95</td></tr>
+  </table>
+
+  <div class="note" style="margin-top:10px">
+    ANCHOR Avg 71.02 ≈ CORAL 71.73；SUN09 <strong>68.60 全场最高</strong>，VOC2007 也超过 CORAL。
+    注意 VLCS 上 ERM 整体偏强——这个数据集风格差异小，对齐方法的收益本就有限，与 DG 文献的普遍观察一致。
+  </div>
+<div class="note" style="margin-top:10px">VLCS 的结果也提示边界很清楚：这里各域都是自然照片，域差异更像采集偏差而不是强风格偏移，所以 ERM 已经很强，强行对齐未必提高 Avg。但 SUN09 最高提示锚定对齐在某些偏移域上仍可能有帮助；这支持“机制依赖数据集结构”的解释。
+  </div>
+</div>
+</section>
+<!-- ─────────────────────── 10 ENGINEERING ─────────────────────── ─────────────────────── -->
+<section class="slide">
+<div class="rev">
+  <div class="eyebrow">工程细节</div>
+  <h2>不改官方代码的<span class="g"> 猴子补丁架构</span></h2>
+  <p style="margin-bottom:12px">整个项目有一条硬约束：不修改 DomainBed 的 <code>algorithms.py</code> 和 <code>hparams_registry.py</code>，保证基线行为 100% 不变、结果可比。</p>
+
+  <div class="cols c2" style="gap:14px">
+    <div>
+      <div class="box blue" style="margin-bottom:10px">
+        <h3>入口机制（dwa_train_v2.py）</h3>
+        <pre style="font-size:12.5px"><span class="c"># 1. 把 DWA 变体注册进 algorithms.ALGORITHMS</span>
+<span class="c"># 2. 替换 get_algorithm_class</span>
+<span class="c"># 3. 替换 hparams_registry</span>
+runpy.run_module(<span class="s">"domainbed.scripts.train"</span>)
+<span class="c"># 官方 train.py 一行没改</span></pre>
+      </div>
+      <div class="box">
+        <h3>烟雾测试（每个变体必跑）</h3>
+        <pre style="font-size:12.5px">--dataset Debug28 --steps 10
+<span class="c"># 检查：无 NaN、cls_loss 下降</span>
+<span class="c"># coral_loss ∼1e-7、anchor_idx 有日志</span></pre>
+      </div>
+    </div>
+    <div>
+      <p style="font-size:15px; color:var(--sub); margin-bottom:10px">最终 ANCHOR 配置</p>
+      <table style="font-size:13px">
+        <tr><th>组件</th><th>设置</th><th>作用</th></tr>
+        <tr><td>分类损失</td><td>mean_e L_e</td><td>保持 ERM 监督信号，不按难域扭曲分类边界</td></tr>
+        <tr><td>CORAL scale</td><td>/ (4d²)</td><td>让对齐项与交叉熵同量级</td></tr>
+        <tr><td>对齐目标</td><td>detach(C_anchor)</td><td>保留最稳源域的判别流形</td></tr>
+        <tr><td>λ</td><td>0.3</td><td>中等强度对齐，避免压过分类</td></tr>
+        <tr><td>τ / γ</td><td>1.0 / 0.5</td><td>非锚域对齐权重：一半均匀，一半自适应</td></tr>
+      </table>
+      <div class="note" style="margin-top:10px">
+        工程页只保留最终方法需要复现的设置；其他探索性变体不再作为汇报主线展开。
+      </div>
+    </div>  </div>
+  </div>
+</div>
+</section>
+
+<!-- ─────────────────────── 12 ANALYSIS ─────────────────────── -->
+<section class="slide">
+<div class="rev">
+  <div class="eyebrow">机制总结</div>
+  <h2>这不是“比 CORAL 全面更强”，而是<span class="g">改变了收益分布</span></h2>
+
+  <div class="cols c2" style="margin-top:14px; gap:14px">
+    <div class="box blue">
+      <h3>原版 CORAL 的收益</h3>
+      <p>平均协方差对齐在本次结果中提升了风格差异最大的目标域，例如 PACS Sketch：73.50 → 79.49。</p>
+      <p style="margin-top:8px">代价是 Art/Photo 这类更自然的域可能被平均目标拉偏，Art 从 ERM 81.17 降到 CORAL 78.24。</p>
+    </div>
+    <div class="box green">
+      <h3>ANCHOR 的收益</h3>
+      <p>ANCHOR 把对齐目标换成最低损失源域，保留一个更稳定、更有判别性的特征流形。</p>
+      <p style="margin-top:8px">因此 Art 比 CORAL 高 +1.47；Photo/Sketch 基本不变。主要代价落在 Cartoon：它被拉向更自然的锚点后，抽象风格特征被压缩。</p>
+    </div>
+  </div>
+
+  <div class="note amber" style="margin-top:14px">
+    结论要克制：单种子下 ANCHOR Avg 80.80，CORAL Avg 80.81，不能宣称统计显著超越。更准确的表述是：ANCHOR 在保持 CORAL 跨风格收益的同时，改善了部分自然图像域的损失。
+  </div>
+</div>
+</section>
+
+<!-- ─────────────────────── 17 CONCLUSION ─────────────────────── -->
+<section class="slide">
+<div class="rev">
+  <div class="eyebrow">结论</div>
+  <h2>做了什么，<span class="gr">接下来做什么</span></h2>
+
+  <div class="cols c2" style="margin-top:14px; gap:16px">
+    <div>
+      <p style="color:var(--sub); font-size:13.5px; text-transform:uppercase; letter-spacing:.1em; margin-bottom:10px">本项目的实质贡献</p>
+            <ul>
+        <li>说明原版 CORAL 的机制：ERM 分类损失 + 源域协方差对齐。</li>
+        <li>指出 CORAL 的关键取舍：帮助 Sketch 这类强风格偏移域，但可能拉低 Art/Photo 这类自然图像域。</li>
+        <li>提出 ANCHOR 单向对齐：不对齐到平均协方差，而是对齐到最低损失源域的 detached covariance。</li>
+        <li>实验上，ANCHOR 让 Art 相比 CORAL 提高 +1.47；Photo/Sketch 基本不变，主要代价是 Cartoon 下降。</li>
+      </ul>
+      <div class="note" style="margin-top:14px">
+        说实话：Avg 上 ANCHOR 基本和 CORAL 打平，我们不能说它统计显著超越。真正有价值的是它解释并改变了 CORAL 的取舍：Art 被救回一部分，但 Cartoon 付出了代价。
+      </div>
+    </div>
+    <div>
+      <p style="color:var(--sub); font-size:13.5px; text-transform:uppercase; letter-spacing:.1em; margin-bottom:10px">后续工作</p>
+      <ul>
+        <li><strong>多种子复现</strong>（≥3 seeds），给均值±标准差，确认差异是否显著</li>
+        <li><strong>类条件 CORAL</strong>：当前对齐边缘协方差，可能压缩类间结构；
+        按类对齐更理想（难点：512 维 + 每类样本少 → 需要收缩估计）</li>
+        <li>更优锚选择策略，或多锚加权平均</li>
+        <li>OfficeHome · DomainNet 等更大基准上验证可扩展性</li>
+      </ul>
+      <pre style="margin-top:12px; font-size:12.5px">python -u -m domainbed.scripts.dwa_train_v2 \
+  --algorithm DWA_CORAL_ANCHOR_ALIGNONLY \
+  --dataset PACS --test_env 0 --steps 3000 \
+  --hparams '{"resnet18":true,"dwa_coral_lambda":0.3,
+              "dwa_coral_tau":1.0,"dwa_mix_gamma":0.5}'</pre>
+    </div>
+  </div>
+
+  <p style="margin-top:20px; text-align:center; font-size:17px; color:var(--ink); letter-spacing:.04em">谢谢 · Questions?</p>
+</div>
+</section>
+
+</div><!-- /deck -->
 
 <script>
-  const slides=[...document.querySelectorAll('.slide')];
-  const bar=document.getElementById('bar'), counter=document.getElementById('counter');
-  let i=0;
-  const pad=n=>String(n).padStart(2,'0');
-  function show(n){
-    i=Math.max(0,Math.min(slides.length-1,n));
-    slides.forEach((s,k)=>s.classList.toggle('active',k===i));
-    bar.style.width=((i)/(slides.length-1)*100)+'%';
-    counter.textContent=pad(i+1)+' / '+pad(slides.length);
-    if(i===9) drawPacs();      // animate bars when chart slide opens
-  }
-  function next(){show(i+1)} function prev(){show(i-1)}
-  document.addEventListener('keydown',e=>{
-    if(['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){e.preventDefault();next()}
-    else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();prev()}
-    else if(e.key==='Home')show(0); else if(e.key==='End')show(slides.length-1);
-    else if(e.key.toLowerCase()==='f'){
-      if(!document.fullscreenElement)document.documentElement.requestFullscreen();
-      else document.exitFullscreen();
-    }
-  });
-  document.addEventListener('click',e=>{ // click right half = next, left = prev
-    if(e.target.closest('a,button,pre,table'))return;
-    (e.clientX > innerWidth*0.35)?next():prev();
-  });
+// ── data ──────────────────────────────────
+const PACS = [
+  ['ERM',             81.17, 'erm'],
+  ['DWA ANCHOR ←',    79.71, 'win'],
+  ['DWA v2',          79.46, 'def'],
+  ['DWA v2 rerun',    79.22, 'def'],
+  ['Mixup',           78.97, 'def'],
+  ['DWA ALIGNONLY',   78.97, 'def'],
+  ['CORAL',           78.24, 'def'],
+  ['GroupDRO',        77.75, 'def'],
+  ['IRM',             43.03, 'def'],
+];
+const VLCS = [
+  ['ERM',            73.92, 'erm'],
+  ['CORAL',          71.73, 'def'],
+  ['DWA ANCHOR ←',  71.02, 'win'],
+  ['GroupDRO',       69.59, 'def'],
+  ['Mixup',          67.78, 'def'],
+  ['IRM',            63.95, 'def'],
+];
 
-  // PACS Avg bar chart (zoomed axis 55..82 to amplify differences)
-  const pacs=[
-    ['ERM',80.86,'erm'],['CORAL',80.81,'gray'],
-    ['★ ANCHOR_ALIGNONLY',80.80,'win'],['DWA_CORAL_v2_rerun',80.53,'gray'],
-    ['DWA_CORAL_ALIGNONLY',80.20,'gray'],['DWA_CORAL_v2',80.08,'gray'],
-    ['Mixup',79.79,'gray'],['GroupDRO',79.68,'gray'],['IRM',57.99,'gray']
-  ];
-  const LO=55,HI=82;
-  function drawPacs(){
-    const host=document.getElementById('pacsChart');
-    if(host.dataset.done)return; host.dataset.done='1';
-    pacs.forEach(([name,v,cls])=>{
-      const row=document.createElement('div');row.className='row';
-      const pct=Math.max(0,Math.min(100,(v-LO)/(HI-LO)*100));
-      row.innerHTML=`<div class="name ${cls==='win'?'win':''}">${name}</div>
-        <div class="track"><div class="fill ${cls}"></div></div>
-        <div class="val">${v.toFixed(2)}</div>`;
-      host.appendChild(row);
-      requestAnimationFrame(()=>{setTimeout(()=>{row.querySelector('.fill').style.width=pct+'%'},60)});
+function buildChart(id, data, lo, hi) {
+  const host = document.getElementById(id);
+  if (host.dataset.done) return;
+  host.dataset.done = '1';
+  data.forEach(([name, v, cls]) => {
+    const pct = Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
+    const row = document.createElement('div');
+    row.className = 'brow';
+    row.innerHTML = `
+      <div class="lbl ${cls === 'win' ? 'win' : ''}">${name}</div>
+      <div class="track"><div class="fill ${cls}" data-pct="${pct}"></div></div>
+      <div class="v">${v.toFixed(2)}</div>`;
+    host.appendChild(row);
+  });
+  requestAnimationFrame(() => setTimeout(() => {
+    host.querySelectorAll('.fill').forEach(f => { f.style.width = f.dataset.pct + '%'; });
+  }, 80));
+}
+
+// ── slides ────────────────────────────────
+const slides = [...document.querySelectorAll('.slide')];
+const N = slides.length;
+const bar = document.getElementById('bar');
+const ctr = document.getElementById('ctr');
+const dotsEl = document.getElementById('dots');
+const tov = document.getElementById('tov');
+let cur = 0;
+
+const pad = n => String(n).padStart(2, '0');
+
+// build dots
+slides.forEach((_, k) => {
+  const d = document.createElement('div');
+  d.className = 'dot';
+  d.onclick = () => show(k);
+  dotsEl.appendChild(d);
+});
+const dotList = [...dotsEl.querySelectorAll('.dot')];
+
+function show(n) {
+  slides[cur].classList.remove('on');
+  cur = Math.max(0, Math.min(N - 1, n));
+  slides[cur].classList.add('on');
+  bar.style.width = (cur / (N - 1) * 100) + '%';
+  ctr.textContent = pad(cur + 1) + ' / ' + pad(N);
+  dotList.forEach((d, k) => d.classList.toggle('on', k === cur));
+  if (slides[cur].querySelector('#pacsChart')) buildChart('pacsChart', PACS, 40, 82);
+  if (slides[cur].querySelector('#vlcsChart')) buildChart('vlcsChart', VLCS, 58, 75);
+  tov.querySelectorAll('.thumb').forEach((t, k) => t.classList.toggle('on', k === cur));
+}
+function next() { show(cur + 1); }
+function prev() { show(cur - 1); }
+
+// keyboard
+document.addEventListener('keydown', e => {
+  if (tov.classList.contains('on')) {
+    if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); closeThumb(); }
+    return;
+  }
+  if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); next(); }
+  else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); prev(); }
+  else if (e.key === 'Home') show(0);
+  else if (e.key === 'End') show(N - 1);
+  else if (e.key.toLowerCase() === 'f') {
+    document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  }
+  else if (e.key === 'Tab') { e.preventDefault(); openThumb(); }
+});
+
+// click nav
+document.addEventListener('click', e => {
+  if (tov.classList.contains('on')) return;
+  if (e.target.closest('a,button,pre,table,code,.thumb')) return;
+  e.clientX > innerWidth * 0.38 ? next() : prev();
+});
+
+// touch
+let tx = 0;
+document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+document.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx;
+  if (Math.abs(dx) > 45) dx < 0 ? next() : prev();
+}, { passive: true });
+
+// thumbnail
+function openThumb() {
+  if (!tov.querySelector('.thumb')) {
+    slides.forEach((s, k) => {
+      const t = document.createElement('div');
+      t.className = 'thumb';
+      const title = s.querySelector('h1,h2')?.textContent.trim().slice(0, 28) || '';
+      t.innerHTML = `<div class="tnum">${pad(k + 1)}</div><div class="tlbl">${title}</div>`;
+      t.style.background = `linear-gradient(135deg,hsl(${220 + k * 7},28%,10%),hsl(${228 + k * 7},22%,8%))`;
+      t.onclick = () => { show(k); closeThumb(); };
+      tov.appendChild(t);
     });
   }
-  show(0);
+  tov.querySelectorAll('.thumb').forEach((t, k) => t.classList.toggle('on', k === cur));
+  tov.classList.add('on');
+}
+function closeThumb() { tov.classList.remove('on'); }
+tov.addEventListener('click', e => { if (e.target === tov) closeThumb(); });
+
+show(0);
 </script>
 </body>
 </html>
