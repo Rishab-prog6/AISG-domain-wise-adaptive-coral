@@ -18,7 +18,7 @@
 - [7. 变体研究（6 个轻量变体）](#7-变体研究6-个轻量变体)
 - [8. 实验结果](#8-实验结果)
 - [9. 分析与讨论](#9-分析与讨论)
-- [10. 超参数与工程细节](#10-超参数与工程细节)
+- [10. 代码结构、超参数与工程细节](#10-代码结构超参数与工程细节)
 - [11. 结论与未来工作](#11-结论与未来工作)
 - [12. 复现方式](#12-复现方式)
 
@@ -453,9 +453,35 @@ cls_loss     = mean_e(L_e)                                 # 仍是 ALIGNONLY
 
 ---
 
-## 10. 超参数与工程细节
+## 10. 代码结构、超参数与工程细节
 
-### 10.1 各变体默认超参（`dwa_hparams_registry_v2.py`）
+### 10.1 代码结构与主要功能模块
+
+```
+domainbed/
+├─ algorithms.py                 # 官方·未改（ERM/CORAL/... 基线）
+├─ hparams_registry.py           # 官方·未改
+├─ dwa_algorithms_v2.py          # ★ 全部 DWA 变体（共享基类 _DWACoralBase）
+├─ dwa_hparams_registry_v2.py    # ★ 各变体超参（默认值 + 随机搜索范围）
+└─ scripts/
+   ├─ train.py                   # 官方·未改（训练主循环）
+   └─ dwa_train_v2.py            # ★ 训练入口：猴子补丁 + runpy 调官方
+results/                          # 各数据集最终结果 CSV/MD
+report/  experiment_report.md · presentation.html   # 报告 + 幻灯片
+```
+
+| 模块 / 类 | 职责 |
+|---|---|
+| `_DWACoralBase` | 共享机制：协方差估计、**归一化 CORAL（÷4d²）**、数值稳定 softmax、warmup、统一的 `update()` 流程；子类通常只重写一个方法 |
+| `DWA_CORAL` | 加权分类 + 加权对齐（v2，warmup 后 softmax 权重） |
+| `…_ALIGNONLY` | 布尔开关 `weight_cls_loss=False`：分类用 ERM 均值，权重只进对齐 |
+| `…_CLIPPED` / `…_EMA` | 重写 `_compute_weights`：权重裁剪 / 损失 EMA 去噪（稳定性消融） |
+| `…_MIXED_LOSSGAP_ALIGNONLY` | 重写 `update`：权重 = 均匀 ⊕ softmax(损失 z + 协方差差 z) |
+| **`…_ANCHOR_ALIGNONLY`** ⭐ | 重写 `update`：argmin 损失选锚、detach 锚协方差、非锚域自适应单向对齐（最终方法） |
+| `dwa_hparams_registry_v2` | 按算法名返回默认超参与随机搜索分布 |
+| `dwa_train_v2` | 注册变体名、替换 `get_algorithm_class` 与超参注册表，再 `runpy` 调官方 `train.py` |
+
+### 10.2 各变体默认超参（`dwa_hparams_registry_v2.py`）
 
 | 变体 | λ | β | τ | 其它 |
 |---|---|---|---|---|
@@ -468,7 +494,7 @@ cls_loss     = mean_e(L_e)                                 # 仍是 ALIGNONLY
 
 > ANCHOR/MIXED 用 τ=1.0（其 score 已 z-score 标准化，较大 τ 仍稳）；其余变体 τ=0.5。
 
-### 10.2 入口机制（不改官方文件的关键）
+### 10.3 入口机制（不改官方文件的关键）
 
 `dwa_train_v2.py` 在调用官方 `train.py` 前做三件事：
 1. 把所有 DWA 变体名注册进 `algorithms.ALGORITHMS`；
@@ -476,7 +502,7 @@ cls_loss     = mean_e(L_e)                                 # 仍是 ALIGNONLY
 3. 把 `hparams_registry.default_hparams / random_hparams` 替换成 v2 版本。
 随后 `runpy.run_module("domainbed.scripts.train")`。这样官方文件一行没改。
 
-### 10.3 烟雾测试（每个变体上线前必跑）
+### 10.4 烟雾测试（每个变体上线前必跑）
 
 ```bash
 python -u -m domainbed.scripts.dwa_train_v2 \
