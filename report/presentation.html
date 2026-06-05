@@ -129,7 +129,7 @@ table.big th,table.big td{padding:11px 12px;font-size:17px}
 </head>
 <body>
 <div id="bar"></div>
-<div id="ctr">01 / 13</div>
+<div id="ctr">01 / 12</div>
 <div id="hint">← → 翻页 · <kbd>Tab</kbd> 总览 · <kbd>F</kbd> 全屏</div>
 <div id="dots"></div>
 <div id="tov"><div id="tov-esc"><kbd>Esc</kbd> 关闭</div></div>
@@ -141,10 +141,10 @@ table.big th,table.big td{padding:11px 12px;font-size:17px}
   <div class="eyebrow">AI Safety · Domain Generalization · DomainBed · ResNet-18 · 3000 steps</div>
   <h1>Domain-Wise Adaptive <span class="g">CORAL</span></h1>
   <div class="fill">
-    <p class="lead">在分布外泛化（OOD）任务上，从一个只有 <strong class="worse">20%</strong> 的失败实现出发，定位并修复关键 bug，再提出有解释性的 <strong>ANCHOR 锚定对齐</strong>——重点说清 <strong>CORAL 提供了什么、ANCHOR 改了什么、为什么 Art 变好而 Cartoon 变差</strong>。</p>
+    <p class="lead">在分布外泛化（OOD）任务上，从一个只有 <strong class="worse">20%</strong> 的失败实现出发，定位并修复关键 bug，再提出有解释性的 <strong>ANCHOR 锚定对齐</strong>。</p>
     <div class="kpis">
       <div class="kpi"><div class="n gr">20% → 80%</div><div class="l">修复尺度 bug 后 PACS Avg</div></div>
-      <div class="kpi"><div class="n">6 个变体</div><div class="l">系统化设计与消融</div></div>
+      <div class="kpi"><div class="n gr">+5.99</div><div class="l">Sketch vs ERM（难域）</div></div>
       <div class="kpi"><div class="n gr">+1.47</div><div class="l">Art vs CORAL（追回）</div></div>
       <div class="kpi"><div class="n">2 数据集</div><div class="l">PACS 主 · VLCS 迁移</div></div>
     </div>
@@ -171,33 +171,14 @@ table.big th,table.big td{padding:11px 12px;font-size:17px}
       <table class="t2">
         <tr><th>任务</th><th>内容</th><th>状态</th></tr>
         <tr><td>复现基线</td><td>ERM/CORAL/GroupDRO/IRM/Mixup（PACS）</td><td class="best">✅ 完成</td></tr>
-        <tr><td>修复 bug</td><td>DWA_CORAL 尺度失配 20% → 80.08%</td><td class="best">✅ 完成</td></tr>
-        <tr><td>变体研究</td><td>ALIGNONLY / CLIPPED / EMA / MIXED / <strong>ANCHOR</strong></td><td class="best">✅ 6 个</td></tr>
+        <tr><td>修复 bug</td><td>CORAL 项尺度失配，准确率 20% → ≈80%</td><td class="best">✅ 完成</td></tr>
+        <tr><td>提出方法</td><td><strong>ANCHOR</strong> 锚定最易域单向对齐</td><td class="best">✅ 完成</td></tr>
         <tr><td>PACS 全量</td><td>4 个 test_env × 3000 steps</td><td class="best">✅ 完成</td></tr>
         <tr><td>VLCS 迁移</td><td>ANCHOR vs 基线，4 域</td><td class="best">✅ 完成</td></tr>
         <tr><td>交付物</td><td>详细报告 + 可视化幻灯片</td><td class="best">✅ 完成</td></tr>
       </table>
     </div>
     <div class="note green">总体完成情况：所有计划任务均已完成；最终方法 <strong>ANCHOR_ALIGNONLY</strong> 在 PACS 上 Avg 与 CORAL 打平、Art 为所有对齐法最高，并在 VLCS 上验证了机制的可迁移性。</div>
-  </div>
-</div></section>
-
-<!-- 03 ITERATION ROUTE -->
-<section class="slide"><div class="rev">
-  <div class="eyebrow">研究路线 · 我们一路是怎么不断改进过来的</div>
-  <h2>R0 → R6：<span class="g">从 20% 失败到锚定对齐</span></h2>
-  <div class="fill">
-    <div class="tl">
-      <div class="tlrow"><div class="tlbadge r">R0</div><div class="tlcard red"><div class="v">原始 DWA_CORAL<small>≈20% 近随机</small></div><div class="d">CORAL 项未归一化、10⁴~10⁶ 淹没分类损失 → <b>修尺度</b></div></div></div>
-      <div class="tlrow"><div class="tlbadge">R1</div><div class="tlcard"><div class="v">v2 修复<small>Avg 80.08 ✅</small></div><div class="d">÷4d² + 稳定 softmax + warmup，救活；但 ≈ CORAL → 追因</div></div></div>
-      <div class="tlrow"><div class="tlbadge">R2</div><div class="tlcard"><div class="v">ALIGNONLY<small>Avg 80.20</small></div><div class="d">加权只进对齐；对齐到均值 C̄ 仍被抽象域带偏 → 换"对齐目标"</div></div></div>
-      <div class="tlrow"><div class="tlbadge s">R2′</div><div class="tlcard"><div class="v">CLIPPED / EMA<small>稳定性消融</small></div><div class="d">权重裁剪 / 损失 EMA 去噪 → 非主线，留作 ablation</div></div></div>
-      <div class="tlrow"><div class="tlbadge">R3</div><div class="tlcard"><div class="v">MIXED_LOSSGAP<small>与 R2 同档</small></div><div class="d">损失+协方差差双信号仍没提升 → 顿悟：问题在<b>目标</b>不在<b>权重</b></div></div></div>
-      <div class="tlrow"><div class="tlbadge g">R4</div><div class="tlcard green"><div class="v">★ ANCHOR_ALIGNONLY<small>80.80 · Art 79.71 · Sketch 79.49</small></div><div class="d">锚定最易域单向对齐 → 保自然流形又保不变性，<b>冠军</b></div></div></div>
-      <div class="tlrow"><div class="tlbadge r">R5</div><div class="tlcard red"><div class="v">ANCHOR_ANNEAL<small>更差 ❌</small></div><div class="d">对齐退火放松 → 不变性发散 → <b>git revert 回退</b>（负结果）</div></div></div>
-      <div class="tlrow"><div class="tlbadge">R6</div><div class="tlcard"><div class="v">VLCS 迁移<small>Avg 71.02 · SUN09 最高</small></div><div class="d">冠军直接搬到 VLCS → 有通用性，非 PACS 过拟合</div></div></div>
-    </div>
-    <p class="note">主线逻辑：<b>先修 bug → 再调加权位置 → 最后改对齐目标 → 验证通用性</b>。真正的突破 R4 来自对 R3"打平信号"的正确解读——读懂"为什么没变好"和"为什么变好"同样重要。</p>
   </div>
 </div></section>
 
@@ -210,7 +191,12 @@ table.big th,table.big td{padding:11px 12px;font-size:17px}
     <div class="cols c3">
       <div class="box blue"><h3>PACS · 7 类（主）</h3><p>Art / Cartoon / Photo / Sketch，画风差异极大。</p>
         <p class="sm" style="margin-top:6px"><span class="pill b">Photo</span><span class="pill b">Art</span>自然图像<br><span class="pill a">Cartoon</span><span class="pill a">Sketch</span>抽象风格</p></div>
-      <div class="box"><h3>VLCS · 5 类（迁移）</h3><p>Caltech101 / LabelMe / SUN09 / VOC2007，都是真实照片，差异来自<strong>采集偏差</strong>。</p><p class="sm" style="margin-top:6px">ERM 本就强，用来检验机制边界。</p></div>
+      <div class="box"><h3>VLCS · 5 类（迁移）</h3><p class="sm">4 个域都是真实照片，差异主要来自<strong>采集偏差</strong>：</p>
+        <p class="sm" style="margin-top:5px;line-height:1.72">
+          <strong>C</strong> Caltech101 — 物体清晰居中、背景简单<br>
+          <strong>L</strong> LabelMe — 场景复杂、背景多<br>
+          <strong>S</strong> SUN09 — 场景数据集、环境上下文强<br>
+          <strong>V</strong> VOC2007 — 自然图像、目标位置/尺度变化大</p></div>
       <div class="box"><h3>协议 & 配置</h3><p class="sm">leave-one-domain-out，4 域各一次。<br>指标：<strong>Avg</strong>（整体）、<strong>Worst</strong>（最差域）。<br>ResNet-18 · Adam · 3000 steps。</p></div>
     </div>
     <div class="note amber">每个源域一个 minibatch → 可<strong>逐域</strong>算损失 Lₑ 与协方差 Cₑ，这是 CORAL / ANCHOR 对齐的数据基础。本文重点解释 PACS 上 <strong>Art 与 Cartoon</strong> 的变化。</div>
@@ -227,8 +213,8 @@ table.big th,table.big td{padding:11px 12px;font-size:17px}
         <div class="tree">domainbed/
 ├─ <span class="off">algorithms.py        (官方·未改)</span>
 ├─ <span class="off">hparams_registry.py  (官方·未改)</span>
-├─ <b>dwa_algorithms_v2.py</b>      ← 全部变体
-├─ <b>dwa_hparams_registry_v2.py</b> ← 各变体超参
+├─ <b>dwa_algorithms_v2.py</b>      ← 算法实现
+├─ <b>dwa_hparams_registry_v2.py</b> ← 超参注册表
 └─ scripts/
    ├─ <span class="off">train.py           (官方·未改)</span>
    └─ <b>dwa_train_v2.py</b>        ← 训练入口
@@ -244,14 +230,30 @@ runpy.run_module(<span class="s">"domainbed.scripts.train"</span>)
     </div>
     <table class="t2">
       <tr><th>模块</th><th>职责</th></tr>
-      <tr><td><strong>_DWACoralBase</strong></td><td>共享：协方差、归一化 CORAL(÷4d²)、稳定 softmax、warmup、统一 update 流程</td></tr>
-      <tr><td>DWA_CORAL / ALIGNONLY / CLIPPED / EMA / MIXED</td><td>5 个权重变体——多数只重写一个方法（_compute_weights / update）</td></tr>
-      <tr class="hl"><td><strong>ANCHOR_ALIGNONLY</strong>（最终）</td><td>锚定最易域单向对齐：argmin 损失选锚、detach 锚协方差、非锚域自适应加权</td></tr>
+      <tr><td><strong>_DWACoralBase</strong></td><td>共享：协方差、归一化 CORAL(÷4d²)、稳定 softmax、统一 update 流程</td></tr>
+      <tr class="hl"><td><strong>ANCHOR_ALIGNONLY</strong>（最终方法）</td><td>锚定最易域单向对齐：argmin 损失选锚、detach 锚协方差、非锚域自适应加权</td></tr>
     </table>
   </div>
 </div></section>
 
-<!-- 05 CORE QUESTION -->
+<!-- 05 CORAL MECHANISM + cost -->
+<section class="slide"><div class="rev">
+  <div class="eyebrow">原版 CORAL · 机制与代价</div>
+  <h2>CORAL <span class="g">帮难域，却伤自然域</span></h2>
+  <div class="fill">
+    <div class="box blue"><h3>CORAL 是怎么做对齐的</h3><p class="sm">CORAL（CORrelation ALignment）不动标签、只对齐特征的<strong>二阶统计量</strong>：对每个源域 e 算特征协方差 <code>Cₑ</code>，再最小化它们到<strong>平均协方差 C̄</strong> 的距离 <code>‖Cₑ − C̄‖²_F</code>。直觉是抹掉各域独有的纹理/画风相关性、逼出<strong>域不变</strong>表征。两个隐含假设：对齐目标取<strong>平均</strong>、且<strong>所有源域权重相等</strong>。</p></div>
+    <div class="cols c2">
+      <div class="box green"><h3>收益：抬高强风格偏移域</h3><p>让源域二阶统计量接近，分类器更难依赖域独有的纹理/画风。<br><strong class="best">Sketch：ERM 73.50 → CORAL 79.49（+5.99）</strong>。</p></div>
+      <div class="box amber"><h3>代价：拉偏自然域</h3><p>平均目标 C̄ 被 Sketch/Cartoon 拉向抽象风格，把 Art 往抽象方向拉。<br><strong class="worse">Art：ERM 81.17 → CORAL 78.24（−2.93）</strong>。</p></div>
+    </div>
+    <div class="cols c21">
+      <div class="box"><h3>ERM → CORAL 的"削峰填谷"（PACS，百分点）</h3><div id="coralDelta"></div></div>
+      <div class="note amber" style="align-self:center"><strong>不足在哪：</strong>① 对齐目标是<strong>平均 C̄</strong>，被 Sketch/Cartoon 等抽象域带偏，把自然域 Art/Photo 拉向抽象（−2.93 / −3.89）；② 各源域<strong>一视同仁</strong>，难易不分。<br><strong>→ 我们改：</strong>对齐到<strong>最低损失（最自然）源域</strong>的 detached 协方差，并按难度给非锚域加权（ANCHOR）。</div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 06 CORE QUESTION -->
 <section class="slide"><div class="rev">
   <div class="eyebrow">核心问题</div>
   <h2>从 CORAL 到 ANCHOR：<span class="g">不换模型，换对齐方式</span></h2>
@@ -264,22 +266,6 @@ runpy.run_module(<span class="s">"domainbed.scripts.train"</span>)
       <pre>loss = mean_e CE(f(x_e), y_e)  +  <span class="k">λ</span> · mean_e ‖ C_e − <span class="n">TARGET</span> ‖²_F / (4d²)
        <span class="c">CORAL:  TARGET = C̄（所有源域协方差平均）</span>
        <span class="c">ANCHOR: TARGET = detach(C_anchor)（当前最低损失的源域）</span></pre></div>
-  </div>
-</div></section>
-
-<!-- 06 CORAL MECHANISM + cost -->
-<section class="slide"><div class="rev">
-  <div class="eyebrow">原版 CORAL · 机制与代价</div>
-  <h2>CORAL <span class="g">帮难域，却伤自然域</span></h2>
-  <div class="fill">
-    <div class="cols c2">
-      <div class="box green"><h3>收益：抬高强风格偏移域</h3><p>让源域二阶统计量接近，分类器更难依赖域独有的纹理/画风。<br><strong class="best">Sketch：ERM 73.50 → CORAL 79.49（+5.99）</strong>。</p></div>
-      <div class="box amber"><h3>代价：拉偏自然域</h3><p>平均目标 C̄ 被 Sketch/Cartoon 拉向抽象风格，把 Art 往抽象方向拉。<br><strong class="worse">Art：ERM 81.17 → CORAL 78.24（−2.93）</strong>。</p></div>
-    </div>
-    <div class="cols c21">
-      <div class="box"><h3>ERM → CORAL 的"削峰填谷"（PACS，百分点）</h3><div id="coralDelta"></div></div>
-      <div class="note" style="align-self:center">CORAL 不是免费午餐：<strong>抬高抽象域</strong>（Sketch +5.99）的同时<strong>压低自然域</strong>（Art −2.93, Photo −3.89）。这正是 ANCHOR 想改善的取舍 →</div>
-    </div>
   </div>
 </div></section>
 
@@ -363,8 +349,6 @@ cls     = mean_e L_e        <span class="c"># λ=0.3, τ=1.0, γ=0.5</span></pre
         <tr><td>GroupDRO</td><td>77.75</td><td>76.50</td><td>88.92</td><td>75.54</td><td>79.68</td><td>75.54</td></tr>
         <tr><td>Mixup</td><td>78.97</td><td class="best">77.56</td><td>92.81</td><td>69.81</td><td>79.79</td><td>69.81</td></tr>
         <tr><td>IRM</td><td>43.03</td><td>60.47</td><td>71.26</td><td>57.20</td><td>57.99</td><td>43.03</td></tr>
-        <tr><td>DWA v2</td><td>79.46</td><td>75.00</td><td>88.92</td><td>76.94</td><td>80.08</td><td>75.00</td></tr>
-        <tr><td>DWA ALIGNONLY</td><td>78.97</td><td>74.15</td><td>89.22</td><td>78.47</td><td>80.20</td><td>74.15</td></tr>
         <tr class="hl"><td>DWA ANCHOR ←</td><td class="best">79.71</td><td>74.79</td><td>89.22</td><td class="best">79.49</td><td>80.80</td><td>74.79</td></tr>
       </table>
       <div class="box" style="display:flex;flex-direction:column;justify-content:center"><h3>ANCHOR − CORAL（pp）</h3><div id="anchorDelta"></div></div>
@@ -410,10 +394,9 @@ cls     = mean_e L_e        <span class="c"># λ=0.3, τ=1.0, γ=0.5</span></pre
   <div class="fill">
     <table class="t2">
       <tr><th>挑战 / 问题</th><th>现象</th><th>解决方案</th></tr>
-      <tr><td>CORAL 项<strong>尺度爆炸</strong></td><td>准确率塌到 ~20%（近随机）</td><td>除以 <code>4d²</code> 标准归一化 → 80.08%</td></tr>
-      <tr><td>加权<strong>分类损失</strong>伤简单域</td><td>v2≈CORAL，Cartoon/Photo 掉</td><td>改为只加权<strong>对齐</strong>（ALIGNONLY）</td></tr>
+      <tr><td>CORAL 项<strong>尺度爆炸</strong></td><td>准确率塌到 ~20%（近随机）</td><td>除以 <code>4d²</code> 标准归一化 → ≈80%</td></tr>
+      <tr><td>加权<strong>分类损失</strong>伤简单域</td><td>难域 loss 高、扭曲监督信号</td><td>分类用 ERM 均值，只加权<strong>对齐</strong></td></tr>
       <tr><td>平均目标被<strong>抽象域带偏</strong></td><td>Art 被伤</td><td><strong>锚定最易域</strong>单向对齐（ANCHOR）</td></tr>
-      <tr><td>退火想再拉回 Art</td><td>反而更差（不变性发散）</td><td><code>git revert</code> 回退，留作<strong>负结果</strong></td></tr>
       <tr><td>单种子<strong>噪声 ±1%</strong></td><td>不能宣称显著超越</td><td>结论克制 + 建议 ≥3 种子复现</td></tr>
       <tr><td>不能改官方代码</td><td>保证可比性</td><td><strong>猴子补丁</strong>架构（dwa_train_v2）</td></tr>
     </table>
@@ -428,7 +411,7 @@ cls     = mean_e L_e        <span class="c"># λ=0.3, τ=1.0, γ=0.5</span></pre
 </div><!-- /stage -->
 
 <script>
-const PACS=[['ERM',81.17,'erm'],['DWA ANCHOR ←',79.71,'win'],['DWA v2',79.46,'def'],['DWA v2 rerun',79.22,'def'],['Mixup',78.97,'def'],['DWA ALIGNONLY',78.97,'def'],['CORAL',78.24,'def'],['GroupDRO',77.75,'def'],['IRM',43.03,'def']];
+const PACS=[['ERM',81.17,'erm'],['DWA ANCHOR ←',79.71,'win'],['Mixup',78.97,'def'],['CORAL',78.24,'def'],['GroupDRO',77.75,'def'],['IRM',43.03,'def']];
 const VLCS=[['ERM',73.92,'erm'],['CORAL',71.73,'def'],['DWA ANCHOR ←',71.02,'win'],['GroupDRO',69.59,'def'],['Mixup',67.78,'def'],['IRM',63.95,'def']];
 function buildChart(id,data,lo,hi){
   const host=document.getElementById(id); if(!host||host.dataset.done)return; host.dataset.done='1';
@@ -448,7 +431,7 @@ function buildScatter(){
   const host=document.getElementById('scatterChart'); if(!host||host.dataset.done)return; host.dataset.done='1';
   const W=560,H=300,mL=44,mR=16,mT=14,mB=36,pw=W-mL-mR,ph=H-mT-mB,xLo=68,xHi=81,yLo=77,yHi=82;
   const xP=s=>mL+(s-xLo)/(xHi-xLo)*pw, yP=a=>mT+(1-(a-yLo)/(yHi-yLo))*ph;
-  const P=[['ERM',73.50,81.17,'#f59e0b',8,-8,'start',7],['CORAL',79.49,78.24,'#7c8fd4',8,16,'start',6.5],['GroupDRO',75.54,77.75,'#5e6e90',0,16,'middle',5],['Mixup',69.81,78.97,'#5e6e90',8,4,'start',5],['DWA v2',76.94,79.46,'#5e6e90',-8,-9,'end',5],['ALIGNONLY',78.47,78.97,'#5e6e90',-8,16,'end',5],['★ ANCHOR',79.49,79.71,'#34d399',10,-10,'start',8.5]];
+  const P=[['ERM',73.50,81.17,'#f59e0b',8,-8,'start',7],['CORAL',79.49,78.24,'#7c8fd4',8,16,'start',6.5],['GroupDRO',75.54,77.75,'#5e6e90',0,16,'middle',5],['Mixup',69.81,78.97,'#5e6e90',8,4,'start',5],['★ ANCHOR',79.49,79.71,'#34d399',10,-10,'start',8.5]];
   let g='';
   for(let s=68;s<=81;s+=2){g+=`<line class="grid-l" x1="${xP(s)}" y1="${mT}" x2="${xP(s)}" y2="${mT+ph}"/><text class="lbl" x="${xP(s)}" y="${mT+ph+19}" text-anchor="middle">${s}</text>`;}
   for(let a=77;a<=82;a++){g+=`<line class="grid-l" x1="${mL}" y1="${yP(a)}" x2="${mL+pw}" y2="${yP(a)}"/><text class="lbl" x="${mL-7}" y="${yP(a)+4}" text-anchor="end">${a}</text>`;}

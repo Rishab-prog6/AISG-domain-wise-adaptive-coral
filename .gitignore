@@ -41,3 +41,6 @@ conda-meta/
 Thumbs.db
 .vscode/
 .idea/
+
+# preparation
+preparation.md
