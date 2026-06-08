@@ -243,8 +243,8 @@ runpy.run_module(<span class="s">"domainbed.scripts.train"</span>)
   <div class="fill">
     <div class="box blue"><h3>CORAL 是怎么做对齐的</h3><p class="sm">CORAL（CORrelation ALignment）不动标签、只对齐特征的<strong>二阶统计量</strong>：对每个源域 e 算特征协方差 <code>Cₑ</code>，再最小化它们到<strong>平均协方差 C̄</strong> 的距离 <code>‖Cₑ − C̄‖²_F</code>。直觉是抹掉各域独有的纹理/画风相关性、逼出<strong>域不变</strong>表征。两个隐含假设：对齐目标取<strong>平均</strong>、且<strong>所有源域权重相等</strong>。</p></div>
     <div class="cols c2">
-      <div class="box green"><h3>收益：抬高强风格偏移域</h3><p>让源域二阶统计量接近，分类器更难依赖域独有的纹理/画风。<br><strong class="best">Sketch：ERM 73.50 → CORAL 79.49（+5.99）</strong>。</p></div>
-      <div class="box amber"><h3>代价：拉偏自然域</h3><p>平均目标 C̄ 被 Sketch/Cartoon 拉向抽象风格，把 Art 往抽象方向拉。<br><strong class="worse">Art：ERM 81.17 → CORAL 78.24（−2.93）</strong>。</p></div>
+      <div class="box green"><h3>收益</h3><p>CORAL 明显提升 Sketch，说明二阶统计量对齐能削弱源域特有的纹理/画风依赖，使模型在强风格偏移域上更稳定。<br><strong class="best">Sketch：ERM 73.50 → CORAL 79.49（+5.99）</strong>。</p></div>
+      <div class="box amber"><h3>代价</h3><p>由于 CORAL 使用平均 covariance 作为对齐目标，可能会过度平滑 source-domain 表示，削弱对 Art / Photo 这类目标域有用的判别特征。<br><strong class="worse">Art：ERM 81.17 → CORAL 78.24（−2.93）</strong><br><strong class="worse">Photo：ERM 93.11 → CORAL 89.22（−3.89）</strong></p></div>
     </div>
     <div class="cols c21">
       <div class="box"><h3>ERM → CORAL 的"削峰填谷"（PACS，百分点）</h3><div id="coralDelta"></div></div>
@@ -297,20 +297,19 @@ cls     = mean_e L_e        <span class="c"># λ=0.3, τ=1.0, γ=0.5</span></pre
 
 <!-- 08 INTUITION + RADAR -->
 <section class="slide"><div class="rev">
-  <div class="eyebrow">ANCHOR · 直觉：为什么 Art↑ 而 Cartoon↓</div>
-  <h2>它改变的是<span class="gr">对齐的方向</span></h2>
+  <div class="eyebrow">ANCHOR · 改变对齐参照，而非模型结构</div>
+  <h2>Art↑ Cartoon↓：<span class="gr">domain-wise trade-off</span></h2>
   <div class="fill">
     <div class="cols c23">
       <div class="cols" style="gap:13px">
-        <div class="box green"><h3>Art 为什么变好 ↑</h3><p>Art 更接近自然图像流形。CORAL 平均目标被抽象域拉偏；ANCHOR 用低损失源域作 detached 参照，<strong>减少拉偏</strong>，Art 78.24 → <strong>79.71</strong>。</p></div>
-        <div class="box amber"><h3>Cartoon 为什么变差 ↓</h3><p>Cartoon 更抽象。锚点偏自然图像，Cartoon 被拉向它后<strong>自身风格特征被压缩</strong>，76.28 → <strong>74.79</strong>。</p></div>
-        <div class="note">Photo、Sketch 与 CORAL 基本不变——ANCHOR 把代价<strong>从 Art 转移到 Cartoon</strong>。</div>
+        <div class="box green"><h3>Art +1.47：缓解 mean alignment 的负迁移</h3><p class="sm">Art 作为 held-out target 时，源域为 Cartoon / Photo / Sketch。相比 CORAL 的平均 covariance 目标，Anchor 用当前低 loss 源域的 detached covariance 作参照，保留了更稳定的判别结构，对 Art 泛化更好。<br><strong class="best">Art：CORAL 78.24 → ANCHOR 79.71（+1.47）</strong></p></div>
+        <div class="box amber"><h3>Cartoon −1.49：anchor 参照不一定适合所有目标域</h3><p class="sm">Cartoon 作为 held-out target 时不参与训练。Anchor 选择的 lowest-loss 源域不一定是最适合 Cartoon 的对齐参照——它可能使 source representation 偏向更稳定的统计量，降低对 Cartoon 风格的泛化。<br><strong class="worse">Cartoon：CORAL 76.28 → ANCHOR 74.79（−1.49）</strong></p></div>
+        <div class="note">总体：DWA Anchor 没有全面超过 CORAL，而是在 <strong>Avg 基本不变</strong>的前提下改变了 domain-wise trade-off——提升 Art，保持 Photo / Sketch，牺牲 Cartoon，Worst 略低于 CORAL。</div>
       </div>
       <div class="box" style="display:flex;flex-direction:column;justify-content:center">
-        <h3 style="text-align:center">四域剖面：谁更均衡</h3>
+        <h3 style="text-align:center">四域剖面对比</h3>
         <div id="radarChart"></div>
         <div class="legend"><span><i style="background:#f59e0b"></i>ERM</span><span><i style="background:#7c8fd4"></i>CORAL</span><span><i style="background:#34d399"></i>ANCHOR</span></div>
-        <p class="sm" style="text-align:center;margin-top:5px;color:var(--dim)">ANCHOR 多边形<strong>更接近正多边形</strong>——更均衡。</p>
       </div>
     </div>
   </div>
@@ -395,14 +394,13 @@ cls     = mean_e L_e        <span class="c"># λ=0.3, τ=1.0, γ=0.5</span></pre
     <table class="t2">
       <tr><th>挑战 / 问题</th><th>现象</th><th>解决方案</th></tr>
       <tr><td>CORAL 项<strong>尺度爆炸</strong></td><td>准确率塌到 ~20%（近随机）</td><td>除以 <code>4d²</code> 标准归一化 → ≈80%</td></tr>
-      <tr><td>加权<strong>分类损失</strong>伤简单域</td><td>难域 loss 高、扭曲监督信号</td><td>分类用 ERM 均值，只加权<strong>对齐</strong></td></tr>
-      <tr><td>平均目标被<strong>抽象域带偏</strong></td><td>Art 被伤</td><td><strong>锚定最易域</strong>单向对齐（ANCHOR）</td></tr>
-      <tr><td>单种子<strong>噪声 ±1%</strong></td><td>不能宣称显著超越</td><td>结论克制 + 建议 ≥3 种子复现</td></tr>
+      <tr><td>Mean covariance alignment <strong>负迁移</strong></td><td>source 平均对齐表示不利于部分 target 泛化</td><td><strong>锚定最低 loss 源域</strong>单向对齐（ANCHOR）</td></tr>
+      <tr><td>缺少多 seed 复现</td><td>单 seed 结果可能存在波动，显著性有限</td><td>结论保持克制 + 建议 ≥3 seed 复现</td></tr>
       <tr><td>不能改官方代码</td><td>保证可比性</td><td><strong>猴子补丁</strong>架构（dwa_train_v2）</td></tr>
     </table>
     <div class="cols c2">
-      <div class="box green"><h3>结论</h3><p class="sm">不是"全面更强"，而是<strong>改变了收益分布</strong>：ANCHOR 把 CORAL 牺牲 Art 的代价转移到 Cartoon，Avg 打平、Art 追回 +1.47，并在 VLCS 复现。</p></div>
-      <div class="box blue"><h3>未来工作</h3><p class="sm">多种子复现确认显著性；<strong>类条件 CORAL</strong> 保类间结构；更优锚选择 / 多锚平均；OfficeHome · DomainNet 验证可扩展性。</p></div>
+      <div class="box green"><h3>结论</h3><p class="sm">DWA Anchor 没有全面超过 CORAL，而是在 <strong>Avg 基本不变</strong>的前提下改变了 domain-wise trade-off：提升 Art（+1.47），保持 Photo / Sketch，牺牲 Cartoon（−1.49）。VLCS 上机制同样成立，非 PACS 过拟合。</p></div>
+      <div class="box blue"><h3>未来工作</h3><p class="sm">多 seed 复现确认显著性；<strong>类条件 CORAL</strong> 保类间结构；更优锚选择 / 多锚平均；OfficeHome · DomainNet 验证可扩展性。</p></div>
     </div>
     <p style="text-align:center;font-size:18px;color:var(--ink);letter-spacing:.04em">谢谢 · Questions?</p>
   </div>
